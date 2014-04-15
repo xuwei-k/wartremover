@@ -15,7 +15,7 @@ class Plugin(val global: Global) extends tools.nsc.plugins.Plugin {
   private[this] var traversers: List[WartTraverser] = List.empty
   private[this] var onlyWarnTraversers: List[WartTraverser] = List.empty
 
-  def getTraverser(mirror: reflect.runtime.universe.Mirror)(name: String): WartTraverser = {
+  private def getTraverser(mirror: reflect.runtime.universe.Mirror)(name: String): WartTraverser = {
     val moduleSymbol = mirror.staticModule(name)
     val instance = mirror.reflectModule(moduleSymbol).instance
     instance.asInstanceOf[WartTraverser]
@@ -30,7 +30,7 @@ class Plugin(val global: Global) extends tools.nsc.plugins.Plugin {
   def filterOptions(prefix: String, options: List[String]) =
     options.map(prefixedOption(prefix)).flatten
 
-  override def processOptions(options: List[String], error: String => Unit) {
+  override def processOptions(options: List[String], error: String => Unit): Unit = synchronized {
     val classPathEntries = filterOptions("cp", options).map(new URL(_))
     val classLoader = new URLClassLoader(classPathEntries.toArray, getClass.getClassLoader)
     val mirror = reflect.runtime.universe.runtimeMirror(classLoader)
