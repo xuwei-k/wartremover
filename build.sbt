@@ -63,12 +63,8 @@ publishMavenStyle := true
 
 publishArtifact in Test := false
 
-publishTo <<= version { (v: String) =>
-  val nexus = "https://oss.sonatype.org/"
-  if (v.trim.endsWith("SNAPSHOT"))
-    Some("snapshots" at nexus + "content/repositories/snapshots")
-  else
-    Some("releases"  at nexus + "service/local/staging/deploy/maven2")
+publishTo := sys.env.get("MAVEN_DIRECTORY").map{ dir =>
+  Resolver.file("gh-pages", file(dir))(Patterns(true, Resolver.mavenStyleBasePattern))
 }
 
 licenses := Seq(
