@@ -5,6 +5,8 @@ import tools.nsc.{Global, Phase}
 
 import java.net.{URL, URLClassLoader}
 
+private object Lock
+
 class Plugin(val global: Global) extends tools.nsc.plugins.Plugin {
   import global._
 
@@ -30,7 +32,7 @@ class Plugin(val global: Global) extends tools.nsc.plugins.Plugin {
   def filterOptions(prefix: String, options: List[String]) =
     options.map(prefixedOption(prefix)).flatten
 
-  override def processOptions(options: List[String], error: String => Unit): Unit = synchronized {
+  override def processOptions(options: List[String], error: String => Unit): Unit = Lock.synchronized {
     val classPathEntries = filterOptions("cp", options).map(new URL(_))
     val classLoader = new URLClassLoader(classPathEntries.toArray, getClass.getClassLoader)
     val mirror = reflect.runtime.universe.runtimeMirror(classLoader)
