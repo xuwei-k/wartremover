@@ -8,6 +8,7 @@ object Unsafe extends WartTraverser {
     AsInstanceOf,
     DefaultArguments,
     EitherProjectionPartial,
+    InfiniteLoop,
     IsInstanceOf,
     NonUnitStatements,
     Null,
