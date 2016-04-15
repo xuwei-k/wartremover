@@ -1,5 +1,6 @@
 sudo: false
 language: scala
+script: sbt "testOnly org.brianmckenna.wartremover.test.GakuzzzzTest"
 scala:
   - 2.10.4
   - 2.11.1
