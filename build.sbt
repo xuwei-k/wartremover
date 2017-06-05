@@ -44,7 +44,7 @@ lazy val root = Project(
 ).settings(commonSettings ++ Seq(
   publishArtifact := false,
   crossVersion := CrossVersion.binary,
-  crossScalaVersions := Seq("2.11.8", "2.10.6", "2.12.0"),
+  crossScalaVersions := Seq("2.11.8", "2.10.6", "2.12.0", "2.13.0-M1"),
   releaseProcess := Seq[ReleaseStep](
     checkSnapshotDependencies,
     inquireVersions,
@@ -82,7 +82,7 @@ lazy val core = Project(
   },
   libraryDependencies ++= Seq(
     "org.scala-lang" % "scala-compiler" % scalaVersion.value,
-    "org.scalatest" %% "scalatest" % "3.0.0" % "test"
+    "org.scalatest" %% "scalatest" % "3.0.3" % "test"
   ),
   // a hack (?) to make `compile` and `+compile` tasks etc. behave sanely
   aggregate := CrossVersion.partialVersion((scalaVersion in Global).value) == Some((2, 10)),
