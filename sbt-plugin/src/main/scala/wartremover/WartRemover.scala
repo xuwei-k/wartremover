@@ -1,5 +1,7 @@
 package wartremover
 
+hoge
+
 object WartRemover extends sbt.AutoPlugin {
   override def trigger = allRequirements
   object autoImport {
