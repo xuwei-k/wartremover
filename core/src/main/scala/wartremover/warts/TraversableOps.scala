@@ -9,7 +9,12 @@ object TraversableOps extends WartTraverser {
     def apply(u: WartUniverse): u.Traverser = {
       import u.universe._
 
-      val symbol = rootMirror.staticClass("scala.collection.Traversable")
+      val symbol = try {
+        rootMirror.staticClass("scala.collection.Traversable")
+      } catch {
+        case _: ScalaReflectionException =>
+          rootMirror.staticClass("scala.collection.Iterable")
+      }
       val Name: TermName = name
       new u.Traverser {
         override def traverse(tree: Tree): Unit = {
