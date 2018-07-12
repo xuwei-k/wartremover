@@ -7,11 +7,11 @@ object Equals extends WartTraverser {
   def apply(u: WartUniverse): u.Traverser = {
     import u.universe._
 
-    val Eqeq: TermName = NameTransformer.encode("==")
-    val NotEq: TermName = NameTransformer.encode("!=")
-    val Equals: TermName = "equals"
-    val Eq: TermName = "eq"
-    val Ne: TermName = "ne"
+    val Eqeq: TermName = TermName(NameTransformer.encode("=="))
+    val NotEq: TermName = TermName(NameTransformer.encode("!="))
+    val Equals: TermName = TermName("equals")
+    val Eq: TermName = TermName("eq")
+    val Ne: TermName = TermName("ne")
 
     new Traverser {
       override def traverse(tree: Tree) = {

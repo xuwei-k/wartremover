@@ -8,8 +8,8 @@ object NonUnitStatements extends WartTraverser {
     import u.universe._
     import scala.reflect.NameTransformer
 
-    val ReadName: TermName = "$read"
-    val IwName: TermName = "$iw"
+    val ReadName: TermName = TermName("$read")
+    val IwName: TermName = TermName("$iw")
     val NodeBufferAddName: TermName = NameTransformer.encode("&+")
 
     @tailrec

@@ -4,7 +4,7 @@ package warts
 object Throw extends WartTraverser {
   def apply(u: WartUniverse): u.Traverser = {
     import u.universe._
-    val ProductElementName: TermName = "productElement"
+    val ProductElementName: TermName = TermName("productElement")
     new u.Traverser {
       override def traverse(tree: Tree): Unit = {
         tree match {

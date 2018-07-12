@@ -7,8 +7,8 @@ object Null extends WartTraverser {
   def apply(u: WartUniverse): u.Traverser = {
     import u.universe._
 
-    val UnapplyName: TermName = "unapply"
-    val UnapplySeqName: TermName = "unapplySeq"
+    val UnapplyName: TermName = TermName("unapply")
+    val UnapplySeqName: TermName = TermName("unapplySeq")
     val Equals: TermName = NameTransformer.encode("==")
     val NotEquals: TermName = NameTransformer.encode("!=")
     val Eq: TermName = NameTransformer.encode("eq")
@@ -19,7 +19,7 @@ object Null extends WartTraverser {
       //   scala.ScalaReflectionException: object scala.xml.Elem in compiler mirror not found.
 
     val optionSymbol = rootMirror.staticClass("scala.Option")
-    val OrNull: TermName = "orNull"
+    val OrNull: TermName = TermName("orNull")
 
     new u.Traverser {
       override def traverse(tree: Tree): Unit = {
