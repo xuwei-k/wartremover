@@ -1,12 +1,12 @@
 package org.wartremover
 package test
 
-import org.scalatest.FunSuite
+import org.junit.Test
 
 import org.wartremover.warts.ToString
 
-class ToStringTest extends FunSuite with ResultAssertions {
-  test("can't use automatic toString method") {
+class ToStringTest extends ResultAssertions {
+  @Test def `can't use automatic toString method` = {
     val result = WartTestTraverser(ToString) {
       class Foo(i: Int)
       val foo: Foo = new Foo(5)
@@ -14,27 +14,27 @@ class ToStringTest extends FunSuite with ResultAssertions {
     }
     assertError(result)("class Foo does not override toString and automatic toString is disabled")
   }
-  test("can't use automatic toString method of TypeRefs") {
+  @Test def `can't use automatic toString method of TypeRefs` = {
     val result = WartTestTraverser(ToString) {
       def foo[A](a: A): String = a.toString
     }
     assertError(result)("class Any does not override toString and automatic toString is disabled")
   }
-  test("can't use generated toString method of case classes") {
+  @Test def `can't use generated toString method of case classes` = {
     val result = WartTestTraverser(ToString) {
       case class Foo(i: Int)
       Foo(5).toString
     }
     assertError(result)("class Foo does not override toString and automatic toString is disabled")
   }
-  test("can't use generated toString method of case objects") {
+  @Test def `can't use generated toString method of case objects` = {
     val result = WartTestTraverser(ToString) {
       case object Foo
       Foo.toString
     }
     assertError(result)("object Foo does not override toString and automatic toString is disabled")
   }
-  test("can use overridden toString method") {
+  @Test def `can use overridden toString method` = {
     val result = WartTestTraverser(ToString) {
       case class Foo(i: Int) {
         override val toString = s"Foo($i)"
@@ -49,7 +49,7 @@ class ToStringTest extends FunSuite with ResultAssertions {
     }
     assertEmpty(result)
   }
-  test("can use toString method of primitives") {
+  @Test def `can use toString method of primitives` = {
     val result = WartTestTraverser(ToString) {
      1.toString
      1l.toString
@@ -61,7 +61,7 @@ class ToStringTest extends FunSuite with ResultAssertions {
     }
     assertEmpty(result)
   }
-  test("ToString wart obeys SuppressWarnings") {
+  @Test def `ToString wart obeys SuppressWarnings` = {
     val result = WartTestTraverser(ToString) {
       case class Foo(i: Int)
       @SuppressWarnings(Array("org.wartremover.warts.ToString"))

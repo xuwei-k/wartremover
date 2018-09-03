@@ -1,19 +1,19 @@
 package org.wartremover
 package test
 
-import org.scalatest.FunSuite
+import org.junit.Test
 
 import org.wartremover.warts.ExplicitImplicitTypes
 
-class ExplicitImplicitTypesTest extends FunSuite with ResultAssertions {
-  test("can't declare implicit vals without a type ascription") {
+class ExplicitImplicitTypesTest extends ResultAssertions {
+  @Test def `can't declare implicit vals without a type ascription` = {
     val result = WartTestTraverser(ExplicitImplicitTypes) {
       implicit val foo = 5
     }
     assertError(result)("implicit definitions must have an explicit type ascription")
   }
 
-  test("can't declare implicit defs without a type ascription") {
+  @Test def `can't declare implicit defs without a type ascription` = {
     val result = WartTestTraverser(ExplicitImplicitTypes) {
       implicit def foo = 5
       implicit def bar[A] = 5
@@ -23,7 +23,7 @@ class ExplicitImplicitTypesTest extends FunSuite with ResultAssertions {
     assertErrors(result)("implicit definitions must have an explicit type ascription", 4)
   }
 
-  test("can declare implicit classes") {
+  @Test def `can declare implicit classes` = {
     val result = WartTestTraverser(ExplicitImplicitTypes) {
       implicit class Foo(i : Int) {
         def bar = 2
@@ -32,7 +32,7 @@ class ExplicitImplicitTypesTest extends FunSuite with ResultAssertions {
     assertEmpty(result)
   }
 
-  test("can declare implicit vals with a type ascription") {
+  @Test def `can declare implicit vals with a type ascription` = {
     val result = WartTestTraverser(ExplicitImplicitTypes) {
       implicit val foo: Int = 5
       implicit var bar: Int = 5
@@ -40,7 +40,7 @@ class ExplicitImplicitTypesTest extends FunSuite with ResultAssertions {
     assertEmpty(result)
   }
 
-  test("can declare implicit defs with a type ascription") {
+  @Test def `can declare implicit defs with a type ascription` = {
     val result = WartTestTraverser(ExplicitImplicitTypes) {
       implicit def foo: Int = 5
       implicit def bar[A]: Int = 5
@@ -50,7 +50,7 @@ class ExplicitImplicitTypesTest extends FunSuite with ResultAssertions {
     assertEmpty(result)
   }
 
-  test("can declare implicit arguments") {
+  @Test def `can declare implicit arguments` = {
     val result = WartTestTraverser(ExplicitImplicitTypes) {
       Option(1).map { implicit i =>
         i
@@ -59,21 +59,21 @@ class ExplicitImplicitTypesTest extends FunSuite with ResultAssertions {
     assertEmpty(result)
   }
 
-  test("can declare non-implicit vals") {
+  @Test def `can declare non-implicit vals` = {
     val result = WartTestTraverser(ExplicitImplicitTypes) {
       val foo = 5
     }
     assertEmpty(result)
   }
 
-  test("can declare non-implicit defs") {
+  @Test def `can declare non-implicit defs` = {
     val result = WartTestTraverser(ExplicitImplicitTypes) {
       def foo = 5
     }
     assertEmpty(result)
   }
 
-  test("can declare backticked implicit defs") {
+  @Test def `can declare backticked implicit defs` = {
     val result = WartTestTraverser(ExplicitImplicitTypes) {
       implicit def `foo`: Int = 5
       implicit val `foobar`: String = "5"
@@ -82,7 +82,7 @@ class ExplicitImplicitTypesTest extends FunSuite with ResultAssertions {
     assertEmpty(result)
   }
 
-  test("ExplicitImplicitTypes wart obeys SuppressWarnings") {
+  @Test def `ExplicitImplicitTypes wart obeys SuppressWarnings` = {
     val result = WartTestTraverser(ExplicitImplicitTypes) {
       @SuppressWarnings(Array("org.wartremover.warts.ExplicitImplicitTypes"))
       implicit val foo = 5

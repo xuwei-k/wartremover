@@ -1,11 +1,11 @@
 package org.wartremover
 package test
 
-import org.scalatest.FunSuite
+import org.junit.Test
 import org.wartremover.warts.PublicInference
 
-class PublicInferenceTest extends FunSuite with ResultAssertions {
-  test("Non-public fields and methods are allowed") {
+class PublicInferenceTest extends ResultAssertions {
+  @Test def `Non-public fields and methods are allowed` = {
     case class X(i: Int)
     val result = WartTestTraverser(PublicInference) {
       class Y {
@@ -25,7 +25,7 @@ class PublicInferenceTest extends FunSuite with ResultAssertions {
     assertEmpty(result)
   }
 
-  test("Public members without type ascription are disabled") {
+  @Test def `Public members without type ascription are disabled` = {
     val result = WartTestTraverser(PublicInference) {
       class c {
         val v = 1
@@ -35,7 +35,7 @@ class PublicInferenceTest extends FunSuite with ResultAssertions {
     assertErrors(result)("Public member must have an explicit type ascription", 2)
   }
 
-  test("Inherited public members without type ascription are allowed") {
+  @Test def `Inherited public members without type ascription are allowed` = {
     val result = WartTestTraverser(PublicInference) {
       trait t {
         def m(): Unit
@@ -47,7 +47,7 @@ class PublicInferenceTest extends FunSuite with ResultAssertions {
     assertEmpty(result)
   }
 
-  test("Public members with explicit types are enabled") {
+  @Test def `Public members with explicit types are enabled` = {
     val result = WartTestTraverser(PublicInference) {
       class c {
         val v: Long = 1
@@ -57,7 +57,7 @@ class PublicInferenceTest extends FunSuite with ResultAssertions {
     assertEmpty(result)
   }
 
-  test("Non-public members without type ascription are enabled") {
+  @Test def `Non-public members without type ascription are enabled` = {
     val result = WartTestTraverser(PublicInference) {
       class c {
         private val v = 1
@@ -67,7 +67,7 @@ class PublicInferenceTest extends FunSuite with ResultAssertions {
     assertEmpty(result)
   }
 
-  test("Explicitly typed multiline should work correctly") {
+  @Test def `Explicitly typed multiline should work correctly` = {
     val result = WartTestTraverser(PublicInference) {
       val a:
         Int = 1
@@ -75,7 +75,7 @@ class PublicInferenceTest extends FunSuite with ResultAssertions {
     assertEmpty(result)
   }
 
-  test("Multiline should work correctly even if not explicitly typed") {
+  @Test def `Multiline should work correctly even if not explicitly typed` = {
     val result = WartTestTraverser(PublicInference) {
       val a
         = 1
@@ -83,7 +83,7 @@ class PublicInferenceTest extends FunSuite with ResultAssertions {
     assertEmpty(result)
   }
 
-  test("Multiline def should also work") {
+  @Test def `Multiline def should also work` = {
     val res = WartTestTraverser(PublicInference) {
       object X {
         def f(
@@ -94,7 +94,7 @@ class PublicInferenceTest extends FunSuite with ResultAssertions {
     assertEmpty(res)
   }
 
-  test("Even a very complex example should pass") {
+  @Test def `Even a very complex example should pass` = {
     val result = WartTestTraverser(PublicInference) {
       class A {
         val a_val = 2 // fails #1
@@ -118,7 +118,7 @@ class PublicInferenceTest extends FunSuite with ResultAssertions {
     assertErrors(result)("Public member must have an explicit type ascription", 5)
   }
 
-  test("Members of non-public classes are ignored") {
+  @Test def `Members of non-public classes are ignored` = {
     val result = WartTestTraverser(PublicInference) {
       object o {
         private class c {
@@ -130,21 +130,21 @@ class PublicInferenceTest extends FunSuite with ResultAssertions {
     assertEmpty(result)
   }
 
-  test("Case classes are enabled") {
+  @Test def `Case classes are enabled` = {
     val result = WartTestTraverser(PublicInference) {
       case class c(i: Int)
     }
     assertEmpty(result)
   }
 
-  test("PublicInference should work with partial functions") {
+  @Test def `PublicInference should work with partial functions` = {
     val result = WartTestTraverser(PublicInference) {
       Seq(1).collect { case 1 => 1 }
     }
     assertEmpty(result)
   }
 
-  test("Public inference of string, char or boolean literals is allowed") {
+  @Test def `Public inference of string, char or boolean literals is allowed` = {
     val result = WartTestTraverser(PublicInference) {
       class c {
         val s = ""
@@ -155,7 +155,7 @@ class PublicInferenceTest extends FunSuite with ResultAssertions {
     assertEmpty(result)
   }
 
-  test("Overridden getters are allowed") {
+  @Test def `Overridden getters are allowed` = {
     val result = WartTestTraverser(PublicInference) {
       trait Foo {
         def bar: Int
@@ -170,14 +170,14 @@ class PublicInferenceTest extends FunSuite with ResultAssertions {
     assertEmpty(result)
   }
 
-  test("Explicit self types are allowed") {
+  @Test def `Explicit self types are allowed` = {
     val result = WartTestTraverser(PublicInference) {
       class c { self => }
     }
     assertEmpty(result)
   }
 
-  test("PublicInference wart obeys SuppressWarnings") {
+  @Test def `PublicInference wart obeys SuppressWarnings` = {
     val result = WartTestTraverser(PublicInference) {
       @SuppressWarnings(Array("org.wartremover.warts.PublicInference"))
       class c {

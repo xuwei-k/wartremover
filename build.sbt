@@ -8,6 +8,7 @@ import java.lang.reflect.Modifier
 
 lazy val baseSettings = Def.settings(
   travisScalaVersions += "2.13.0-M5",
+  testOptions += Tests.Argument(TestFrameworks.JUnit, "-v"),
   scalaVersion := {
     val v = travisScalaVersions.value
     v.find(_.startsWith("2.12")).getOrElse(sys.error(s"not found Scala 2.12.x version $v"))
@@ -125,15 +126,9 @@ lazy val core = Project(
     }
   },
   libraryDependencies ++= Seq(
+    "com.novocode" % "junit-interface" % "0.11" % "test",
     "org.scala-lang" % "scala-compiler" % scalaVersion.value
   ),
-  libraryDependencies ++= {
-    if (scalaVersion.value == "2.13.0-M5") {
-      Nil
-    } else {
-      Seq("org.scalatest" %% "scalatest" % "3.0.6-SNAP1" % "test")
-    }
-  },
   assemblyOutputPath in assembly := file("./wartremover-assembly.jar")
 )
   .dependsOn(testMacros % "test->compile")
@@ -216,13 +211,7 @@ lazy val testMacros: Project = Project(
   publishLocal := {},
   publishSigned := {},
   publishLocalSigned := {},
-  libraryDependencies ++= {
-    if (scalaVersion.value == "2.13.0-M5") {
-      Nil
-    } else {
-      Seq("org.typelevel" %% "macro-compat" % "1.1.1")
-    }
-  },
+  libraryDependencies += "org.typelevel" %% "macro-compat" % "1.1.1",
   libraryDependencies ++= Seq(
     "org.scala-lang" % "scala-compiler" % scalaVersion.value % "provided"
   ),

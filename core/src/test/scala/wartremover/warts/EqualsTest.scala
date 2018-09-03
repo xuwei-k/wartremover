@@ -1,12 +1,12 @@
 package org.wartremover
 package test
 
-import org.scalatest.FunSuite
-
+import org.junit.Assert.assertEquals
+import org.junit.Test
 import org.wartremover.warts.Equals
 
-class EqualsTest extends FunSuite with ResultAssertions {
-  test("can't use == or != method on primitives") {
+class EqualsTest extends ResultAssertions {
+  @Test def `can't use == or != method on primitives` = {
     val result1 = WartTestTraverser(Equals) {
       5 == "foo"
     }
@@ -18,7 +18,7 @@ class EqualsTest extends FunSuite with ResultAssertions {
     assertError(result2)("!= is disabled - use =/= or equivalent instead")
   }
 
-  test("can't use == or != on classes") {
+  @Test def `can't use == or != on classes` = {
     class Foo(i: Int)
 
     val result1 = WartTestTraverser(Equals) {
@@ -32,7 +32,7 @@ class EqualsTest extends FunSuite with ResultAssertions {
     assertError(result2)("!= is disabled - use =/= or equivalent instead")
   }
 
-  test("can't use == or != on case classes") {
+  @Test def `can't use == or != on case classes` = {
     case class Foo(i: Int)
 
     val result1 = WartTestTraverser(Equals) {
@@ -51,7 +51,7 @@ class EqualsTest extends FunSuite with ResultAssertions {
     assertError(result3)("== is disabled - use === or equivalent instead")
   }
 
-  test("can't use equals") {
+  @Test def `can't use equals` = {
     class Foo(i: Int)
 
     val result = WartTestTraverser(Equals) {
@@ -62,7 +62,7 @@ class EqualsTest extends FunSuite with ResultAssertions {
     assertErrors(result)("equals is disabled - use === or equivalent instead", 2)
   }
 
-  test("can't use overridden equals") {
+  @Test def `can't use overridden equals` = {
     class Foo(i:Int) {
       override def equals(obj: scala.Any) = false
     }
@@ -73,14 +73,14 @@ class EqualsTest extends FunSuite with ResultAssertions {
     assertError(result)("equals is disabled - use === or equivalent instead")
   }
 
-  test("can use custom equals") {
+  @Test def `can use custom equals` = {
     val result = WartTestTraverser(Equals) {
       java.util.Arrays.equals(Array(1), Array(1))
     }
     assertEmpty(result)
   }
 
-  test("can't use eq or ne") {
+  @Test def `can't use eq or ne` = {
     class Foo(i: Int)
 
     val result1 = WartTestTraverser(Equals) {
@@ -94,7 +94,7 @@ class EqualsTest extends FunSuite with ResultAssertions {
     assertError(result2)("ne is disabled - use =/= or equivalent instead")
   }
 
-  test("Equals wart obeys SuppressWarnings") {
+  @Test def `Equals wart obeys SuppressWarnings` = {
     val result = WartTestTraverser(Equals) {
       case class Foo(i: Int)
       @SuppressWarnings(Array("org.wartremover.warts.Equals"))
@@ -105,26 +105,28 @@ class EqualsTest extends FunSuite with ResultAssertions {
     assertEmpty(result)
   }
 
-  test("Equals should work in synthetic lambdas") {
+  @Test def `Equals should work in synthetic lambdas` = {
     val result = WartTestTraverser(Equals) {
       Seq(1, 2, 3).exists(_ == 1)
       Seq(1, 2, 3).exists(n => n != 1)
     }
-    assertResult(List(
+    assertEquals("result.errors",
+      List(
       "[wartremover:Equals] == is disabled - use === or equivalent instead",
       "[wartremover:Equals] != is disabled - use =/= or equivalent instead"),
-      "result.errors")(result.errors)
+      result.errors)
   }
 
-  test("Equals should work in explicit lambdas") {
+  @Test def `Equals should work in explicit lambdas` = {
     val result = WartTestTraverser(Equals) {
       Seq(1, 2, 3).exists(new Function1[Int, Boolean] { def apply(i: Int): Boolean = i == 1 })
       Seq(1, 2, 3).exists(new Function1[Int, Boolean] { def apply(i: Int): Boolean = i != 1 })
     }
-    assertResult(List(
+    assertEquals("result.errors",
+      List(
       "[wartremover:Equals] == is disabled - use === or equivalent instead",
       "[wartremover:Equals] != is disabled - use =/= or equivalent instead"),
-      "result.errors")(result.errors)
+      result.errors)
   }
 
 }

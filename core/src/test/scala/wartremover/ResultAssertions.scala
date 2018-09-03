@@ -1,25 +1,25 @@
 package org.wartremover
 package test
 
-import org.scalatest.Assertions
+import org.junit.Assert.assertEquals
 
-trait ResultAssertions extends Assertions {
+trait ResultAssertions {
 
   def assertEmpty(result: WartTestTraverser.Result) = {
-    assertResult(List.empty, "result.errors")(result.errors)
-    assertResult(List.empty, "result.warnings")(result.warnings)
+    assertEquals("result.errors", List.empty, result.errors)
+    assertEquals("result.warnings", List.empty, result.warnings)
   }
 
   def assertError(result: WartTestTraverser.Result)(message: String) = assertErrors(result)(message, 1)
 
   def assertErrors(result: WartTestTraverser.Result)(message: String, times: Int) = {
-    assertResult(List.fill(times)(message), "result.errors")(result.errors.map(skipTraverserPrefix))
-    assertResult(List.empty, "result.warnings")(result.warnings.map(skipTraverserPrefix))
+    assertEquals("result.errors", List.fill(times)(message), result.errors.map(skipTraverserPrefix))
+    assertEquals("result.warnings", List.empty, result.warnings.map(skipTraverserPrefix))
   }
 
   def assertWarnings(result: WartTestTraverser.Result)(message: String, times: Int) = {
-    assertResult(List.empty, "result.errors")(result.errors.map(skipTraverserPrefix))
-    assertResult(List.fill(times)(message), "result.warnings")(result.warnings.map(skipTraverserPrefix))
+    assertEquals("result.errors", List.empty, result.errors.map(skipTraverserPrefix))
+    assertEquals("result.warnings", List.fill(times)(message), result.warnings.map(skipTraverserPrefix))
   }
 
   private val messageFormat = """^\[wartremover:\S+\] (.+)$""".r

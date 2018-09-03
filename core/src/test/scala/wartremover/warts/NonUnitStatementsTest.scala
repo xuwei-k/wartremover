@@ -1,33 +1,33 @@
 package org.wartremover
 package test
 
-import org.scalatest.FunSuite
+import org.junit.Test
 
 import org.wartremover.warts.NonUnitStatements
 
-class NonUnitStatementsTest extends FunSuite with ResultAssertions {
-  test("non-unit statements are disabled") {
+class NonUnitStatementsTest extends ResultAssertions {
+  @Test def `non-unit statements are disabled` = {
     val result = WartTestTraverser(NonUnitStatements) {
       1
       2
     }
     assertError(result)("Statements must return Unit")
   }
-  test("Extending a class with multiple parameter lists doesn't fail") {
+  @Test def `Extending a class with multiple parameter lists doesn't fail` = {
     val result = WartTestTraverser(NonUnitStatements) {
       class A(x: Int)(y: Int)(z: Int)
       class B(x: Int)(y: Int)(z: Int) extends A(x)(y)(z)
     }
     assertEmpty(result)
   }
-  test("XML literals don't fail") {
+  @Test def `XML literals don't fail` = {
     val result = WartTestTraverser(NonUnitStatements) {
       val a = 13
       <x>{a}</x>
     }
     assertEmpty(result)
   }
-  test("&+ method but not xml") {
+  @Test def `&+ method but not xml` = {
     class A {
       def &+(i: Int): A = this
     }
@@ -39,7 +39,7 @@ class NonUnitStatementsTest extends FunSuite with ResultAssertions {
     assertError(result)("Statements must return Unit")
   }
 
-  test("NonUnitStatements wart obeys SuppressWarnings") {
+  @Test def `NonUnitStatements wart obeys SuppressWarnings` = {
     val result = WartTestTraverser(NonUnitStatements) {
       @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
       val foo = {

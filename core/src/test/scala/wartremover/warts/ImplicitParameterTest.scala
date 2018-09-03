@@ -1,12 +1,12 @@
 package org.wartremover
 package test
 
-import org.scalatest.FunSuite
+import org.junit.Test
 import org.wartremover.warts.ImplicitParameter
 
-class ImplicitParameterTest extends FunSuite with ResultAssertions {
+class ImplicitParameterTest extends ResultAssertions {
 
-  test("Implicit parameters are disabled") {
+  @Test def `Implicit parameters are disabled` = {
     val result = WartTestTraverser(ImplicitParameter) {
       def f()(implicit s: String) = ()
 
@@ -15,14 +15,14 @@ class ImplicitParameterTest extends FunSuite with ResultAssertions {
     assertErrors(result)("Implicit parameters are disabled", 2)
   }
 
-  test("Context bounds are enabled") {
+  @Test def `Context bounds are enabled` = {
     val result = WartTestTraverser(ImplicitParameter) {
       def f[A: Seq]() = ()
     }
     assertEmpty(result)
   }
 
-  test("Parent context bounds are enabled") {
+  @Test def `Parent context bounds are enabled` = {
     val result = WartTestTraverser(ImplicitParameter) {
       class C[F] {
         def f[A](a: A)(implicit F: List[F]) = {}
@@ -31,7 +31,7 @@ class ImplicitParameterTest extends FunSuite with ResultAssertions {
     assertEmpty(result)
   }
 
-  test("Parent abstract types are enabled") {
+  @Test def `Parent abstract types are enabled` = {
     val result = WartTestTraverser(ImplicitParameter) {
       class C {
         type A
@@ -41,21 +41,21 @@ class ImplicitParameterTest extends FunSuite with ResultAssertions {
     assertEmpty(result)
   }
 
-  test("Desugared context bounds are enabled") {
+  @Test def `Desugared context bounds are enabled` = {
     val result = WartTestTraverser(ImplicitParameter) {
       def f[A, B](implicit ev: Either[A, _], ev2: Either[_, Seq[B]]) = ()
     }
     assertEmpty(result)
   }
 
-  test("Defs without parameters don't lead to a crash") {
+  @Test def `Defs without parameters don't lead to a crash` = {
     val result = WartTestTraverser(ImplicitParameter) {
       def f = ()
     }
     assertEmpty(result)
   }
 
-  test("ImplicitParameter wart obeys SuppressWarnings") {
+  @Test def `ImplicitParameter wart obeys SuppressWarnings` = {
     val result = WartTestTraverser(ImplicitParameter) {
       @SuppressWarnings(Array("org.wartremover.warts.ImplicitParameter"))
       def f()(implicit s: String) = ()

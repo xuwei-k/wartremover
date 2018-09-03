@@ -1,21 +1,21 @@
 package org.wartremover
 package test
 
-import org.scalatest.FunSuite
+import org.junit.Test
 
 import org.wartremover.warts.Any
 
-class AnyTest extends FunSuite with ResultAssertions {
+class AnyTest extends ResultAssertions {
   private def foo: Any = 42
 
-  test("Any can't be inferred") {
+  @Test def `Any can't be inferred` = {
     val result = WartTestTraverser(Any) {
       val x = foo
       x
     }
     assertError(result)("Inferred type containing Any")
   }
-  test("Any wart obeys SuppressWarnings") {
+  @Test def `Any wart obeys SuppressWarnings` = {
     val result = WartTestTraverser(Any) {
       @SuppressWarnings(Array("org.wartremover.warts.Any"))
       val x = foo

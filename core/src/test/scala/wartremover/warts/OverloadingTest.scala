@@ -1,12 +1,12 @@
 package org.wartremover
 package test
 
-import org.scalatest.FunSuite
+import org.junit.Test
 
 import org.wartremover.warts.Overloading
 
-class OverloadingTest extends FunSuite with ResultAssertions {
-  test("Overloading is disabled") {
+class OverloadingTest extends ResultAssertions {
+  @Test def `Overloading is disabled` = {
     val result = WartTestTraverser(Overloading) {
       class c {
         def f(i: Int) = {}
@@ -17,7 +17,7 @@ class OverloadingTest extends FunSuite with ResultAssertions {
     assertErrors(result)("Overloading is disabled", 3)
   }
 
-  test("Overriding is allowed") {
+  @Test def `Overriding is allowed` = {
     trait t {
       def print(x: String): Unit
       def print(x: Int): Unit = print(x.toString)
@@ -32,7 +32,7 @@ class OverloadingTest extends FunSuite with ResultAssertions {
     assertEmpty(result)
   }
 
-  test("Overloading wart obeys SuppressWarnings") {
+  @Test def `Overloading wart obeys SuppressWarnings` = {
     val result = WartTestTraverser(Overloading) {
       @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
       class c {
@@ -44,7 +44,7 @@ class OverloadingTest extends FunSuite with ResultAssertions {
     assertEmpty(result)
   }
 
-  test("Overloading wart obeys SuppressWarnings on defs") {
+  @Test def `Overloading wart obeys SuppressWarnings on defs` = {
     val result = WartTestTraverser(Overloading) {
       class c {
         def f(i: Int) = {}

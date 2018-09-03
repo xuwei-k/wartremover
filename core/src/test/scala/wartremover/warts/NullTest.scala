@@ -1,19 +1,19 @@
 package org.wartremover
 package test
 
-import org.scalatest.FunSuite
+import org.junit.Test
 
 import org.wartremover.warts.Null
 
-class NullTest extends FunSuite with ResultAssertions {
-  test("can't use `null`") {
+class NullTest extends ResultAssertions {
+  @Test def `can't use null` = {
     val result = WartTestTraverser(Null) {
       println(null)
     }
     assertError(result)("null is disabled")
   }
 
-  test("reference field placeholder is disabled") {
+  @Test def `reference field placeholder is disabled` = {
     val result = WartTestTraverser(Null) {
       class c {
         var s: String = _
@@ -30,7 +30,7 @@ class NullTest extends FunSuite with ResultAssertions {
     assertEmpty(resultPrimitive)
   }
 
-  test("can't use null in patterns") {
+  @Test def `can't use null in patterns` = {
     val result = WartTestTraverser(Null) {
       val (a, b) = (1, null)
       println(a)
@@ -38,7 +38,7 @@ class NullTest extends FunSuite with ResultAssertions {
     assertError(result)("null is disabled")
   }
 
-  test("can't use null in default arguments") {
+  @Test def `can't use null in default arguments` = {
     val result = WartTestTraverser(Null) {
       class ClassWithArgs(val foo: String = null)
       case class CaseClassWithArgs(val foo: String = null)
@@ -46,21 +46,21 @@ class NullTest extends FunSuite with ResultAssertions {
     assertErrors(result)("null is disabled", 2)
   }
 
-  test("can't use null inside of Map#partition") {
+  @Test def `can't use null inside of Map#partition` = {
     val result = WartTestTraverser(Null) {
       Map(1 -> "one", 2 -> "two").partition { case (k, v) => null.asInstanceOf[Boolean] }
     }
     assertError(result)("null is disabled")
   }
 
-  test("can't use `Option#orNull`") {
+  @Test def `can't use "Option#orNull"` = {
     val result = WartTestTraverser(Null) {
       println(None.orNull)
     }
     assertError(result)("Option#orNull is disabled")
   }
 
-  test("can use null in conditions") {
+  @Test def `can use null in conditions` = {
     val result = WartTestTraverser(Null) {
       null == ""
       null != ""
@@ -74,7 +74,7 @@ class NullTest extends FunSuite with ResultAssertions {
     assertEmpty(result)
   }
 
-  test("Null wart obeys SuppressWarnings") {
+  @Test def `Null wart obeys SuppressWarnings` = {
     val result = WartTestTraverser(Null) {
       @SuppressWarnings(Array("org.wartremover.warts.Null"))
       val foo = {
@@ -88,7 +88,7 @@ class NullTest extends FunSuite with ResultAssertions {
     assertEmpty(result)
   }
 
-  test("Null wart obeys SuppressWarnings in classes with default arguments") {
+  @Test def `Null wart obeys SuppressWarnings in classes with default arguments` = {
     val result = WartTestTraverser(Null) {
       @SuppressWarnings(Array("org.wartremover.warts.Null"))
       class ClassWithArgs(val foo: String = null)

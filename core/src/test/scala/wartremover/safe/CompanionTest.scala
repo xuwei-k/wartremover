@@ -1,19 +1,19 @@
 package org.wartremover
 package test
 
-import org.scalatest.FunSuite
+import org.junit.Test
 
 import org.wartremover.warts.Unsafe
 
-class CompanionTest extends FunSuite with ResultAssertions {
-  test("can use companion objects for case classes") {
+class CompanionTest extends ResultAssertions {
+  @Test def `can use companion objects for case classes` = {
     val result = WartTestTraverser(Unsafe) {
       case class Foo(n: Int)
       object Foo
     }
     assertEmpty(result)
   }
-  test("can use companion objects for type aliases") {
+  @Test def `can use companion objects for type aliases` = {
     val result = WartTestTraverser(Unsafe) {
       trait T[R]
       type T1 = String

@@ -1,12 +1,12 @@
 package org.wartremover
 package test
 
-import org.scalatest.FunSuite
-
+import org.junit.Assert.assertEquals
+import org.junit.Test
 import org.wartremover.warts.Unsafe
 
-class UnsafeTest extends FunSuite {
-  test("can't use `null`, `var`, non-unit statements, Option#get, LeftProjection#get, RightProjection#get, or any2stringadd") {
+class UnsafeTest {
+  @Test def `can't use null, var, non-unit statements, Option#get, LeftProjection#get, RightProjection#get, or any2stringadd` = {
     val result = WartTestTraverser(Unsafe) {
       val x = List(1, true, "three")
       var u = {} + "Hello!"
@@ -17,7 +17,8 @@ class UnsafeTest extends FunSuite {
       println(Right(42).right.get)
       println(null)
     }
-    assertResult(
+    assertEquals(
+      "result.errors",
       Set("[wartremover:Any] Inferred type containing Any",
            "[wartremover:EitherProjectionPartial] LeftProjection#get is disabled - use LeftProjection#toOption instead",
            "[wartremover:EitherProjectionPartial] RightProjection#get is disabled - use RightProjection#toOption instead",
@@ -25,7 +26,8 @@ class UnsafeTest extends FunSuite {
            "[wartremover:Null] null is disabled",
            "[wartremover:OptionPartial] Option#get is disabled - use Option#fold instead",
            "[wartremover:StringPlusAny] Implicit conversion to string is disabled",
-           "[wartremover:Var] var is disabled"), "result.errors")(result.errors.toSet)
-    assertResult(List.empty, "result.warnings")(result.warnings)
+           "[wartremover:Var] var is disabled"),
+           result.errors.toSet)
+    assertEquals("result.warnings", List.empty, result.warnings)
   }
 }

@@ -1,12 +1,12 @@
 package org.wartremover
 package test
 
-import org.scalatest.FunSuite
+import org.junit.Test
 
 import org.wartremover.warts.{ Enumeration => EnumerationWart }
 
-class EnumerationTest extends FunSuite with ResultAssertions {
-  test("can't declare Enumeration classes") {
+class EnumerationTest extends ResultAssertions {
+  @Test def `can't declare Enumeration classes` = {
     val result = WartTestTraverser(EnumerationWart) {
       class Color extends Enumeration {
         val Red = Value
@@ -15,7 +15,7 @@ class EnumerationTest extends FunSuite with ResultAssertions {
     }
     assertError(result)("Enumeration is disabled - use case objects instead")
   }
-  test("can't declare Enumeration objects") {
+  @Test def `can't declare Enumeration objects` = {
     val result = WartTestTraverser(EnumerationWart) {
       object Color extends Enumeration {
         val Red = Value
@@ -24,14 +24,14 @@ class EnumerationTest extends FunSuite with ResultAssertions {
     }
     assertError(result)("Enumeration is disabled - use case objects instead")
   }
-  test("can use user-defined Enumeration traits") {
+  @Test def `can use user-defined Enumeration traits` = {
     val result = WartTestTraverser(EnumerationWart) {
       trait Enumeration
       object Foo extends Enumeration
     }
     assertEmpty(result)
   }
-  test("Enumeration wart obeys SuppressWarnings") {
+  @Test def `Enumeration wart obeys SuppressWarnings` = {
     val result = WartTestTraverser(EnumerationWart) {
       @SuppressWarnings(Array("org.wartremover.warts.Enumeration"))
       object Color extends Enumeration {

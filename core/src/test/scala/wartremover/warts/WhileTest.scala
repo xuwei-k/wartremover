@@ -1,12 +1,12 @@
 package org.wartremover
 package test
 
-import org.scalatest.FunSuite
+import org.junit.Test
 
 import org.wartremover.warts.While
 
-class WhileTest extends FunSuite with ResultAssertions {
-  test("while is disabled") {
+class WhileTest extends ResultAssertions {
+  @Test def `while is disabled` = {
     val result = WartTestTraverser(While) {
       while (true) {
         println()
@@ -15,7 +15,7 @@ class WhileTest extends FunSuite with ResultAssertions {
     assertError(result)("while is disabled")
   }
 
-  test("do while is disabled") {
+  @Test def `do while is disabled` = {
     val result = WartTestTraverser(While) {
       do {
         println()
@@ -24,7 +24,7 @@ class WhileTest extends FunSuite with ResultAssertions {
     assertError(result)("while is disabled")
   }
 
-  test("while wart obeys SuppressWarnings") {
+  @Test def `while wart obeys SuppressWarnings` = {
     val result = WartTestTraverser(While) {
       @SuppressWarnings(Array("org.wartremover.warts.While"))
       def f() = {

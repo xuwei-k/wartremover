@@ -1,12 +1,12 @@
 package org.wartremover
 package test
 
-import org.scalatest.FunSuite
+import org.junit.Test
 
 import org.wartremover.warts.StringPlusAny
 
-class StringPlusAnyTest extends FunSuite with ResultAssertions {
-  test("Implicit conversion to string is disabled") {
+class StringPlusAnyTest extends ResultAssertions {
+  @Test def `Implicit conversion to string is disabled` = {
     val result = WartTestTraverser(StringPlusAny) {
       {} + "lol"
       "lol" + 1
@@ -15,28 +15,28 @@ class StringPlusAnyTest extends FunSuite with ResultAssertions {
     assertErrors(result)("Implicit conversion to string is disabled", 3)
   }
 
-  test("Primitive conversion to string is disabled") {
+  @Test def `Primitive conversion to string is disabled` = {
     val result = WartTestTraverser(StringPlusAny) {
       1 + "lol"
     }
     assertError(result)("Implicit conversion to string is disabled")
   }
 
-  test("Non-string + usage is allowed") {
+  @Test def `Non-string + usage is allowed` = {
     val result = WartTestTraverser(StringPlusAny) {
       1 + 1
     }
     assertEmpty(result)
   }
 
-  test("string literal concatenation is allowed") {
+  @Test def `string literal concatenation is allowed` = {
     val result = WartTestTraverser(StringPlusAny) {
       "a" + "b"
     }
     assertEmpty(result)
   }
 
-  test("concatenating strings with if statements is allowed.") {
+  @Test def `concatenating strings with if statements is allowed.` = {
     val result = WartTestTraverser(StringPlusAny) {
       "" + (if (true) "" else "")
       (if (true) "" else "") + ""
@@ -44,14 +44,14 @@ class StringPlusAnyTest extends FunSuite with ResultAssertions {
     assertEmpty(result)
   }
 
-  test("inserting into a Set is allowed") {
+  @Test def `inserting into a Set is allowed` = {
     val result = WartTestTraverser(StringPlusAny) {
       Set("") + ""
     }
     assertEmpty(result)
   }
 
-  test("custom-defined + is allowed") {
+  @Test def `custom-defined + is allowed` = {
     val result = WartTestTraverser(StringPlusAny) {
       class C { def +(s: String) = s }
       new C + "a"
@@ -59,14 +59,14 @@ class StringPlusAnyTest extends FunSuite with ResultAssertions {
     assertEmpty(result)
   }
  
-  test("Concatenation of a string with a block containing an if-statement is allowed.") {
+  @Test def `Concatenation of a string with a block containing an if-statement is allowed.` = {
     val result = WartTestTraverser(StringPlusAny) {
       "" + { val x = ""; if (true) x else x }
     }
     assertEmpty(result)
   }
   
-  test("Adding float variables to an int value is allowed.") {
+  @Test def `Adding float variables to an int value is allowed.` = {
     val result = WartTestTraverser(StringPlusAny) {
       val a:Float = 1
       0 + a
@@ -74,7 +74,7 @@ class StringPlusAnyTest extends FunSuite with ResultAssertions {
     assertEmpty(result)
   }
 
-  test("StringPlusAny wart obeys SuppressWarnings") {
+  @Test def `StringPlusAny wart obeys SuppressWarnings` = {
     val result = WartTestTraverser(StringPlusAny) {
       @SuppressWarnings(Array("org.wartremover.warts.StringPlusAny"))
       val foo = {} + "lol"
@@ -82,14 +82,14 @@ class StringPlusAnyTest extends FunSuite with ResultAssertions {
     assertEmpty(result)
   }
 
-  test("adding Float values is allowed") {
+  @Test def `adding Float values is allowed` = {
     val result = WartTestTraverser(StringPlusAny) {
       1f + 1f
     }
     assertEmpty(result)
   }
   
-  test("adding with StringOps is allowed") {
+  @Test def `adding with StringOps is allowed` = {
     val result = WartTestTraverser(StringPlusAny) {
       "" + ("" padTo (1, ' '))
     }

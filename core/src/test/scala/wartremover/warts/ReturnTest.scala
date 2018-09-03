@@ -1,24 +1,24 @@
 package org.wartremover
 package test
 
-import org.scalatest.FunSuite
+import org.junit.Test
 
 import org.wartremover.warts.Return
 
-class ReturnTest extends FunSuite with ResultAssertions {
-  test("local return is disabled") {
+class ReturnTest extends ResultAssertions {
+  @Test def `local return is disabled` = {
     val result = WartTestTraverser(Return) {
       def foo(n:Int): Int = return n + 1
     }
     assertError(result)("return is disabled")
   }
-  test("nonlocal return is disabled") {
+  @Test def `nonlocal return is disabled` = {
     val result = WartTestTraverser(Return) {
       def foo(ns: List[Int]): Any = ns.map(n => return n + 1)
     }
     assertError(result)("return is disabled")
   }
-  test("Return wart is disabled") {
+  @Test def `Return wart is disabled` = {
     val result = WartTestTraverser(Return) {
       @SuppressWarnings(Array("org.wartremover.warts.Return"))
       def foo(n:Int): Int = return n + 1

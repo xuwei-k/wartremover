@@ -1,24 +1,24 @@
 package org.wartremover
 package test
 
-import org.scalatest.FunSuite
+import org.junit.Test
 
 import org.wartremover.warts.Unsafe
 
-class XmlLiteralTest extends FunSuite with ResultAssertions {
-  test("can use xml literals") {
+class XmlLiteralTest extends ResultAssertions {
+  @Test def `can use xml literals` = {
     val result = WartTestTraverser(Unsafe) {
       val x = <foo />
     }
     assertEmpty(result)
   }
-  test("can use attributes in xml literals") {
+  @Test def `can use attributes in xml literals` = {
     val result = WartTestTraverser(Unsafe) {
       <foo bar="baz" />
     }
     assertEmpty(result)
   }
-  test("can use xmlns attrib in XML literals") {
+  @Test def `can use xmlns attrib in XML literals` = {
     val result = WartTestTraverser(Unsafe) {
       <x xmlns="y"/> // this one has special meaning
     }
