@@ -7,7 +7,6 @@ import scala.reflect.NameTransformer
 import java.lang.reflect.Modifier
 
 lazy val baseSettings = Def.settings(
-  travisScalaVersions += "2.13.0-M5",
   testOptions += Tests.Argument(TestFrameworks.JUnit, "-v"),
   scalaVersion := {
     val v = travisScalaVersions.value

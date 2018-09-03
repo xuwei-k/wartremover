@@ -5,28 +5,18 @@ scala:
   - 2.11.12
   - 2.12.6
   - 2.13.0-M4
+  - 2.13.0-M5
 jdk:
-  - openjdk7
   - oraclejdk8
 matrix:
   include:
     - scala: 2.12.6
       jdk: oraclejdk10
-    - scala: 2.13.0-M5
-      jdk: oraclejdk8
-      script:
-      # TODO enable test
-      - sbt "++ ${TRAVIS_SCALA_VERSION}" core/compile
     - scala: scripted-test
       jdk: oraclejdk8
       env: SCRIPT=";+ core/publishLocal;+ sbt-plugin/scripted"
       script:
       - sbt "${SCRIPT}"
-  exclude:
-    - scala: 2.12.6
-      jdk: openjdk7
-    - scala: 2.13.0-M4
-      jdk: openjdk7
 script: sbt "+++$TRAVIS_SCALA_VERSION compile" "+++$TRAVIS_SCALA_VERSION test"
 cache:
   directories:
