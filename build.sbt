@@ -23,6 +23,7 @@ lazy val commonSettings = Def.settings(
   ),
   publishMavenStyle := true,
   publishArtifact in Test := false,
+  scalacOptions += "-Yrangepos",
   scalacOptions in (Compile, doc) ++= {
     val base = (baseDirectory in LocalRootProject).value.getAbsolutePath
     val t = sys.process.Process("git rev-parse HEAD").lines_!.head
