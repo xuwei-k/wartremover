@@ -1,6 +1,8 @@
 package org.wartremover
 package warts
 
+import scala.reflect.NameTransformer
+
 trait ForbidInference[T] extends WartTraverser {
   def applyForbidden(u: WartUniverse)(implicit t: u.TypeTag[T]): u.Traverser = {
     import u.universe._
@@ -9,6 +11,7 @@ trait ForbidInference[T] extends WartTraverser {
     val EqualsName: TermName = "equals"
     val ProductElementName: TermName = "productElement"
     val ProductIteratorName: TermName = "productIterator"
+    val NodeBufferAddName: TermName = NameTransformer.encode("&+")
 
     // since Scala 2.13 https://github.com/scala/scala/commit/efc48213073ce5e68a7fd7dc9820610eccdeb9f7
     val ProductElementNameName: TermName = "productElementName"
@@ -30,6 +33,8 @@ trait ForbidInference[T] extends WartTraverser {
         tree match {
           // Ignore trees marked by SuppressWarnings
           case t if hasWartAnnotation(u)(t) =>
+          case Apply(Select(qual, NodeBufferAddName), _)
+            if qual.tpe.typeSymbol.fullName == "scala.xml.NodeBuffer" =>
           case tpt @ TypeTree() if wasInferred(u)(tpt) && tpt.tpe.contains(tSymbol) =>
             tpt.tpe match {
               // Ignore existential types, they supposedly contain "any"

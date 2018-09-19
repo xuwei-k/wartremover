@@ -15,6 +15,14 @@ class AnyTest extends FunSuite with ResultAssertions {
     }
     assertError(result)("Inferred type containing Any")
   }
+
+  test("xml") {
+    val result = WartTestTraverser(Any) {
+      <x>{List(1) map identity}</x>
+    }
+    assertEmpty(result)
+  }
+
   test("Any wart obeys SuppressWarnings") {
     val result = WartTestTraverser(Any) {
       @SuppressWarnings(Array("org.wartremover.warts.Any"))
