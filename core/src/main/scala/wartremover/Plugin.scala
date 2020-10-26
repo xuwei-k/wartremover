@@ -1,8 +1,9 @@
 package org.wartremover
 
+import java.io.File
+
 import tools.nsc.plugins.PluginComponent
 import tools.nsc.{Global, Phase}
-
 import java.net.{URL, URLClassLoader}
 
 class Plugin(val global: Global) extends tools.nsc.plugins.Plugin {
@@ -32,11 +33,16 @@ class Plugin(val global: Global) extends tools.nsc.plugins.Plugin {
     options.map(prefixedOption(prefix)).flatten
 
   override def processOptions(options: List[String], error: String => Unit): Unit = {
-    val classPathEntries = filterOptions("cp", options).map(new URL(_))
-    classPathEntries.foreach{
-      u =>
-        println(new java.io.File(u.toURI).getAbsolutePath)
+    val classPathEntries = filterOptions("cp", options).map {
+      c =>
+        val filePrefix = "file:"
+        if (c startsWith filePrefix) {
+          new File(c.drop(filePrefix.length)).getCanonicalFile.toURI.toURL
+        } else {
+          new URL(c)
+        }
     }
+    classPathEntries.foreach(println)
     val classLoader = new URLClassLoader(classPathEntries.toArray, getClass.getClassLoader)
     val mirror = reflect.runtime.universe.runtimeMirror(classLoader)
 
