@@ -21,13 +21,7 @@ object WartRemover extends sbt.AutoPlugin {
   }
 
   override def globalSettings = Seq(
-    autoImport.wartremoverPluginJarsDir := {
-      if (VersionNumber(sbtVersion.value).matchesSemVer(SemanticSelector(">=1.4.0"))) {
-        Some((LocalRootProject / target).value / "compiler_plugins")
-      } else {
-        None
-      }
-    },
+
     autoImport.wartremoverCrossVersion := CrossVersion.full,
     autoImport.wartremoverDependencies := Nil,
     autoImport.wartremoverErrors := Nil,
@@ -38,42 +32,65 @@ object WartRemover extends sbt.AutoPlugin {
 
   def copyCompilerPluginSetting(c: Configuration): Def.SettingsDefinition = {
     (c / scalacOptions) := {
-      val log = streams.value.log
-      autoImport.wartremoverPluginJarsDir.value match {
-        case Some(compilerPluginsDir) =>
-          val base = (LocalRootProject / baseDirectory).value
-          val prefix = "-Xplugin:"
-          (c / scalacOptions).value.map { opt =>
-            if (opt startsWith prefix) {
-              val originalPluginFile = file(opt.drop(prefix.length))
-              val pluginJarName = originalPluginFile.getName
-              val targetJar = compilerPluginsDir / pluginJarName
-              if (!targetJar.isFile) {
-                IO.copyFile(
-                  sourceFile = originalPluginFile,
-                  targetFile = targetJar
-                )
-              }
-              IO.relativize(base, targetJar).map(prefix + _).getOrElse {
-                log.warn(s"$base is not a parent of $targetJar")
-                opt
-              }
-            } else {
-              opt
-            }
+      val base = baseDirectory.value
+      val prefix = "-Xplugin:"
+      (c / scalacOptions).value.map { opt =>
+        if (opt startsWith prefix) {
+          val originalPluginFile = file(opt.drop(prefix.length))
+          copyToCompilerPluginJarsDir(
+            src = originalPluginFile,
+            jarDir = autoImport.wartremoverPluginJarsDir.value,
+            base = base
+          ).map(prefix + _).getOrElse {
+            opt
           }
-        case None =>
-          (c / scalacOptions).value
+        } else {
+          opt
+        }
       }
+    }
+  }
+
+  def copyToCompilerPluginJarsDir(src: File, jarDir: Option[File], base: File) = {
+    jarDir match {
+      case Some(compilerPluginsDir) =>
+        if (src.isFile) {
+          val jarName = src.getName
+          val targetJar = compilerPluginsDir / jarName
+          if (!targetJar.isFile) {
+            IO.copyFile(
+              sourceFile = src,
+              targetFile = targetJar
+            )
+            println(s"$src から $targetJar にcopy")
+          } else {
+            println(targetJar + " は既にファイル")
+          }
+          IO.relativize(base, targetJar).map("file:" + _)
+        } else if(src.isDirectory) {
+          IO.relativize(base, src).map("file:" + _)
+        } else {
+          sys.error(s"ファイルでもディレクトリでもない？ $src")
+        }
+      case None =>
+        println("wartremoverPluginJarsDir is None")
+        None
     }
   }
 
   override lazy val projectSettings: Seq[Def.Setting[_]] = Def.settings(
     libraryDependencies += {
-      compilerPlugin("org.wartremover" %% "wartremover" % Wart.PluginVersion cross autoImport.wartremoverCrossVersion.value)
+      compilerPlugin("org.wartremover" %% "wartremover" % "2.4.11" cross autoImport.wartremoverCrossVersion.value)
     },
     Seq(Compile, Test).flatMap(copyCompilerPluginSetting),
     inScope(Scope.ThisScope)(Seq(
+      autoImport.wartremoverPluginJarsDir := {
+        if (VersionNumber(sbtVersion.value).matchesSemVer(SemanticSelector(">=1.4.0"))) {
+          Some(target.value / "compiler_plugins")
+        } else {
+          None
+        }
+      },
       autoImport.wartremoverClasspaths ++= {
         val ivy = ivySbt.value
         val s = streams.value
@@ -84,7 +101,15 @@ object WartRemover extends sbt.AutoPlugin {
             case None =>
               m
           }
-          getArtifact(moduleId, ivy, s).toURI.toString
+          val a = getArtifact(moduleId, ivy, s)
+          copyToCompilerPluginJarsDir(
+            src = a,
+            jarDir = autoImport.wartremoverPluginJarsDir.value,
+            base = baseDirectory.value
+          ).getOrElse{
+            s.log.warn(s"しっぱいしたので絶対pathつかうよ $a")
+            a.toURI.toString
+          }
         }
       },
       derive(scalacOptions ++= autoImport.wartremoverErrors.value.distinct map (w => s"-P:wartremover:traverser:${w.clazz}")),

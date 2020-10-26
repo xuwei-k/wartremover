@@ -1,9 +1,3 @@
-> + compile
-> changeBinary
-> + compile
-
-$ copy-file ExcludeTest.scala.disable ExcludeTest.scala
-> set wartremoverErrors += Wart.ArrayEquals
--> compile
-> set wartremoverExcluded += file("ExcludeTest.scala")
 > compile
+> show zincAnalysis
+> show zincApi
