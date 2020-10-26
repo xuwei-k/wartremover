@@ -1,0 +1,3 @@
+object ExcludeTest {
+  def a: Boolean = Array(2) == Array(2) // ArrayEqual wart
+}
