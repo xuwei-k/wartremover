@@ -1,0 +1,19 @@
+> show myWarts/scalacOptions
+> wartremoverPluginJarsDir
+> show myWarts/libraryDependencies
+> show myWarts/wartremoverClasspaths
+> myWarts/compile
+> show a1/wartremoverExcluded
+> compile
+> project a1
+> wartremoverPluginJarsDir
+> show Compile / wartremoverClasspaths
+> show scalacOptions
+> show Compile / scalacOptions
+> show Compile / compile / scalacOptions
+> compile
+> zincAnalysis
+> zincApi
+$ exec grep kenji a1/inc_compile.bin.txt
+> set every wartremoverPluginJarsDir := None
+> compile
