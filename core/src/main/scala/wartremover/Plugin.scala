@@ -33,6 +33,10 @@ class Plugin(val global: Global) extends tools.nsc.plugins.Plugin {
 
   override def processOptions(options: List[String], error: String => Unit): Unit = {
     val classPathEntries = filterOptions("cp", options).map(new URL(_))
+    classPathEntries.foreach{
+      u =>
+        println(new java.io.File(u.toURI).getAbsolutePath)
+    }
     val classLoader = new URLClassLoader(classPathEntries.toArray, getClass.getClassLoader)
     val mirror = reflect.runtime.universe.runtimeMirror(classLoader)
 

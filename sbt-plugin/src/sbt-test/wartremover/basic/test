@@ -1,3 +1,6 @@
+> show scalacOptions
+> show Compile / scalacOptions
+> show Compile / compile / scalacOptions
 > compile
 > show zincAnalysis
 > show zincApi

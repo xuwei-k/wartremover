@@ -20,8 +20,17 @@ object WartRemover extends sbt.AutoPlugin {
     val Warts = wartremover.Warts
   }
 
-  override def globalSettings = Seq(
+  private val wartremoverBase = settingKey[File]("").withRank(KeyRanks.Invisible)
 
+  override def globalSettings = Seq(
+    autoImport.wartremoverPluginJarsDir := {
+      if (VersionNumber(sbtVersion.value).matchesSemVer(SemanticSelector(">=1.4.0"))) {
+        Some(wartremoverBase.value / "compiler_plugins")
+      } else {
+        None
+      }
+    },
+    wartremoverBase := (LocalRootProject / baseDirectory).value,
     autoImport.wartremoverCrossVersion := CrossVersion.full,
     autoImport.wartremoverDependencies := Nil,
     autoImport.wartremoverErrors := Nil,
@@ -32,7 +41,7 @@ object WartRemover extends sbt.AutoPlugin {
 
   def copyCompilerPluginSetting(c: Configuration): Def.SettingsDefinition = {
     (c / scalacOptions) := {
-      val base = baseDirectory.value
+      val base = wartremoverBase.value
       val prefix = "-Xplugin:"
       (c / scalacOptions).value.map { opt =>
         if (opt startsWith prefix) {
@@ -41,9 +50,7 @@ object WartRemover extends sbt.AutoPlugin {
             src = originalPluginFile,
             jarDir = autoImport.wartremoverPluginJarsDir.value,
             base = base
-          ).map(prefix + _).getOrElse {
-            opt
-          }
+          ).map(prefix + _).getOrElse(opt)
         } else {
           opt
         }
@@ -66,9 +73,9 @@ object WartRemover extends sbt.AutoPlugin {
           } else {
             println(targetJar + " は既にファイル")
           }
-          IO.relativize(base, targetJar).map("file:" + _)
+          Some("file:" + base.toPath.relativize(targetJar.toPath))
         } else if(src.isDirectory) {
-          IO.relativize(base, src).map("file:" + _)
+          Some("file:" + base.toPath.relativize(src.toPath))
         } else {
           sys.error(s"ファイルでもディレクトリでもない？ $src")
         }
@@ -80,17 +87,11 @@ object WartRemover extends sbt.AutoPlugin {
 
   override lazy val projectSettings: Seq[Def.Setting[_]] = Def.settings(
     libraryDependencies += {
+      //compilerPlugin("org.wartremover" %% "wartremover" % Wart.PluginVersion cross autoImport.wartremoverCrossVersion.value)
       compilerPlugin("org.wartremover" %% "wartremover" % "2.4.11" cross autoImport.wartremoverCrossVersion.value)
     },
     Seq(Compile, Test).flatMap(copyCompilerPluginSetting),
     inScope(Scope.ThisScope)(Seq(
-      autoImport.wartremoverPluginJarsDir := {
-        if (VersionNumber(sbtVersion.value).matchesSemVer(SemanticSelector(">=1.4.0"))) {
-          Some(target.value / "compiler_plugins")
-        } else {
-          None
-        }
-      },
       autoImport.wartremoverClasspaths ++= {
         val ivy = ivySbt.value
         val s = streams.value
@@ -105,11 +106,8 @@ object WartRemover extends sbt.AutoPlugin {
           copyToCompilerPluginJarsDir(
             src = a,
             jarDir = autoImport.wartremoverPluginJarsDir.value,
-            base = baseDirectory.value
-          ).getOrElse{
-            s.log.warn(s"しっぱいしたので絶対pathつかうよ $a")
-            a.toURI.toString
-          }
+            base = (LocalRootProject / baseDirectory).value
+          ).getOrElse(a.toURI.toString)
         }
       },
       derive(scalacOptions ++= autoImport.wartremoverErrors.value.distinct map (w => s"-P:wartremover:traverser:${w.clazz}")),
@@ -117,16 +115,9 @@ object WartRemover extends sbt.AutoPlugin {
       derive(scalacOptions ++= {
         // use relative path if possible
         // https://github.com/sbt/sbt/issues/6027
-        val log = streams.value.log
         autoImport.wartremoverExcluded.value.distinct.map { c =>
-          val base = baseDirectory.value
-          val x = IO.relativizeFile(base, c) match {
-            case Some(f) =>
-              f
-            case None =>
-              log.info(s"$base is not a parent of $c")
-              c.getAbsolutePath
-          }
+          val base = wartremoverBase.value
+          val x = base.toPath.relativize(c.toPath)
           s"-P:wartremover:excluded:$x"
         }
       }),
