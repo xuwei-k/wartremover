@@ -20,11 +20,8 @@ object WartRemover extends sbt.AutoPlugin {
     val Warts = wartremover.Warts
   }
 
-  private val wartremoverBase = settingKey[File]("").withRank(KeyRanks.Invisible)
 
   override def globalSettings = Seq(
-    wartremoverBase := (LocalRootProject / baseDirectory).value,
-
     autoImport.wartremoverCrossVersion := CrossVersion.full,
     autoImport.wartremoverDependencies := Nil,
     autoImport.wartremoverErrors := Nil,
@@ -32,26 +29,6 @@ object WartRemover extends sbt.AutoPlugin {
     autoImport.wartremoverExcluded := Nil,
     autoImport.wartremoverClasspaths := Nil
   )
-
-  def copyCompilerPluginSetting(c: Configuration): Def.SettingsDefinition = {
-    (c / scalacOptions) := {
-      val prefix = "-Xplugin:"
-      (c / scalacOptions).value.map { opt =>
-        if (opt startsWith prefix) {
-          val originalPluginFile = file(opt.drop(prefix.length))
-          copyToCompilerPluginJarsDir(
-            src = originalPluginFile,
-            jarDir = autoImport.wartremoverPluginJarsDir.value,
-            base = baseDirectory.value
-          ).map{
-            prefix + _
-          }.getOrElse(opt)
-        } else {
-          opt
-        }
-      }
-    }
-  }
 
   def copyToCompilerPluginJarsDir(src: File, jarDir: Option[File], base: File) = {
     jarDir match {
@@ -85,7 +62,23 @@ object WartRemover extends sbt.AutoPlugin {
       compilerPlugin("org.wartremover" %% "wartremover" % Wart.PluginVersion cross autoImport.wartremoverCrossVersion.value)
       //compilerPlugin("org.wartremover" %% "wartremover" % "2.4.11" cross autoImport.wartremoverCrossVersion.value)
     },
-    Seq(Compile, Test).flatMap(copyCompilerPluginSetting),
+    scalacOptions := {
+      val prefix = "-Xplugin:"
+      scalacOptions.value.map { opt =>
+        if (opt startsWith prefix) {
+          val originalPluginFile = file(opt.drop(prefix.length))
+          copyToCompilerPluginJarsDir(
+            src = originalPluginFile,
+            jarDir = autoImport.wartremoverPluginJarsDir.value,
+            base = baseDirectory.value
+          ).map{
+            prefix + _
+          }.getOrElse(opt)
+        } else {
+          opt
+        }
+      }
+    },
     inScope(Scope.ThisScope)(Seq(
       autoImport.wartremoverPluginJarsDir := {
         if (VersionNumber(sbtVersion.value).matchesSemVer(SemanticSelector(">=1.4.0"))) {

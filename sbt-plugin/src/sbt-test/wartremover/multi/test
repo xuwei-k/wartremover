@@ -1,0 +1,14 @@
+> show myWarts/scalacOptions
+> wartremoverPluginJarsDir
+> compile
+> project a1
+> wartremoverPluginJarsDir
+> show wartremoverClasspaths
+> show Compile / wartremoverClasspaths
+> show scalacOptions
+> show Compile / scalacOptions
+> show Compile / compile / scalacOptions
+> compile
+#$ pause
+#> show zincAnalysis
+#> show zincApi
