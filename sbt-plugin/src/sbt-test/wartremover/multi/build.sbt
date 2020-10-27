@@ -2,7 +2,10 @@ lazy val commonSettings = Def.settings(
   crossScalaVersions := Seq("2.11.12", "2.12.12", "2.13.3"),
   scalaVersion := "2.13.3",
   wartremoverWarnings ++= Warts.all,
-  wartremoverWarnings += ContribWart.OldTime,
+  wartremoverWarnings += Wart.custom("org.wartremover.contrib.warts.OldTime"),
+  wartremoverDependencies += {
+    "org.wartremover" %% "wartremover-contrib" % "1.3.9" cross wartremoverCrossVersion.value
+  },
   wartremoverWarnings += Wart.JavaConversions,
   Seq(Compile, Test).flatMap { s =>
     import sbt.internal.inc.Schema.AnalysisFile

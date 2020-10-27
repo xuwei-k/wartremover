@@ -41,44 +41,48 @@ object WartRemover extends sbt.AutoPlugin {
               sourceFile = src,
               targetFile = targetJar
             )
-            println(s"$src から $targetJar にcopy")
+            println(s"copy from $src to $targetJar")
           } else {
-            println(targetJar + " は既にファイル")
+            println("file " + targetJar + " already exists")
           }
           Some(base.toPath.relativize(targetJar.toPath))
         } else if(src.isDirectory) {
           Some(base.toPath.relativize(src.toPath))
         } else {
-          sys.error(s"ファイルでもディレクトリでもない？ $src")
+          sys.error(s"neither file nor directory!? $src")
         }
       case None =>
-        println("wartremoverPluginJarsDir is None")
-        None
+        sys.error("wartremoverPluginJarsDir is None")
     }
   }
 
-  override lazy val projectSettings: Seq[Def.Setting[_]] = Def.settings(
-    libraryDependencies += {
-      compilerPlugin("org.wartremover" %% "wartremover" % Wart.PluginVersion cross autoImport.wartremoverCrossVersion.value)
-      //compilerPlugin("org.wartremover" %% "wartremover" % "2.4.11" cross autoImport.wartremoverCrossVersion.value)
-    },
-    scalacOptions := {
+  def scalacOptionSetting(k: TaskKey[Seq[String]]) = {
+    k := {
       val prefix = "-Xplugin:"
-      scalacOptions.value.map { opt =>
+      k.value.map { opt =>
         if (opt startsWith prefix) {
           val originalPluginFile = file(opt.drop(prefix.length))
           copyToCompilerPluginJarsDir(
             src = originalPluginFile,
             jarDir = autoImport.wartremoverPluginJarsDir.value,
-            base = baseDirectory.value
-          ).map{
+            base = (LocalRootProject / baseDirectory).value
+          ).map {
             prefix + _
           }.getOrElse(opt)
         } else {
           opt
         }
       }
+    }
+  }
+
+  override lazy val projectSettings: Seq[Def.Setting[_]] = Def.settings(
+    libraryDependencies += {
+      compilerPlugin("org.wartremover" %% "wartremover" % Wart.PluginVersion cross autoImport.wartremoverCrossVersion.value)
     },
+    scalacOptionSetting(scalacOptions),
+    scalacOptionSetting(Compile / scalacOptions),
+    scalacOptionSetting(Test / scalacOptions),
     inScope(Scope.ThisScope)(Seq(
       autoImport.wartremoverPluginJarsDir := {
         if (VersionNumber(sbtVersion.value).matchesSemVer(SemanticSelector(">=1.4.0"))) {
@@ -101,7 +105,7 @@ object WartRemover extends sbt.AutoPlugin {
           copyToCompilerPluginJarsDir(
             src = a,
             jarDir = autoImport.wartremoverPluginJarsDir.value,
-            base = baseDirectory.value
+            base = (LocalRootProject / baseDirectory).value
           ).map("file:" + _).getOrElse(a.toURI.toString)
         }
       },
