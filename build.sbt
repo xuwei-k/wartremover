@@ -125,6 +125,7 @@ def crossSrcSetting(c: Configuration) = {
 
 val coreSettings = Def.settings(
   commonSettings,
+  scalaVersion := "3.1.1",
   name := "wartremover",
   Test / fork := true,
   crossScalaVersions := allScalaVersions,
@@ -136,9 +137,13 @@ val coreSettings = Def.settings(
         libraryDependencies.value
     }
   },
-  libraryDependencies ++= Seq(
-    "org.scala-lang" % "scala-compiler" % scalaVersion.value
-  ),
+  libraryDependencies += {
+    if (scalaBinaryVersion.value == "3") {
+      "org.scala-lang" %% "scala3-compiler" % scalaVersion.value
+    } else {
+      "org.scala-lang" % "scala-compiler" % scalaVersion.value
+    }
+  },
   libraryDependencies ++= {
     Seq("org.scalatest" %% "scalatest" % "3.2.11" % "test")
   },
@@ -238,10 +243,12 @@ lazy val sbtPlug: Project = Project(
     val file = base / "wartremover" / "Wart.scala"
     val warts = wartClasses.value
     val expectCount = 44
+/*
     assert(
       warts.size == expectCount,
       s"${warts.size} != ${expectCount}. please update build.sbt when add or remove wart"
     )
+*/
     val wartsDir = core.base / "src" / "main" / "scala" / "wartremover" / "warts"
     val unsafe = warts.filter(IO.read(wartsDir / "Unsafe.scala") contains _)
     val content =
@@ -270,6 +277,7 @@ lazy val testMacros: Project = Project(
   base = file("test-macros")
 ).settings(
   baseSettings,
+  scalaVersion := "3.1.1",
   crossScalaVersions := allScalaVersions,
   publish / skip := true,
   publishArtifact := false,
@@ -277,7 +285,11 @@ lazy val testMacros: Project = Project(
   publishLocal := {},
   PgpKeys.publishSigned := {},
   PgpKeys.publishLocalSigned := {},
-  libraryDependencies ++= Seq(
-    "org.scala-lang" % "scala-compiler" % scalaVersion.value % "provided"
-  )
+  libraryDependencies += {
+    if (scalaBinaryVersion.value == "3") {
+      "org.scala-lang" %% "scala3-compiler" % scalaVersion.value
+    } else {
+      "org.scala-lang" % "scala-compiler" % scalaVersion.value
+    }
+  },
 )
