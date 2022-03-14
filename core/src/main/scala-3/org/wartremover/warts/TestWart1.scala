@@ -13,6 +13,8 @@ object TestWart1 extends WartTraverser {
             report.warning("inferred Matchable", tree.pos)
           case a: TypeTree if a.tpe =:= TypeRepr.of[Any] =>
             report.warning("inferred Any", tree.pos)
+          case a: TypeTree if a.tpe =:= TypeRepr.of[AnyVal] =>
+            report.warning("Inferred type containing AnyVal: AnyVal", tree.pos)
           case a: TypeTree if a.tpe <:< TypeRepr.of[scala.App] =>
             report.warning("do not extends scala.App", tree.pos)
           case _ =>

@@ -75,12 +75,10 @@ class InferenceMatchablePhase(warts: List[WartTraverser]) extends PluginPhase {
   final def wartTraverse(tree: Tree)(using c: Context): c.type = {
     val c2 = QuotesCache.init(c.fresh)
     val q = scala.quoted.runtime.impl.QuotesImpl()(using c2)
-    val universe = new WartUniverse {
-      override val quotes: Quotes = q
-    }
     //println(warts.size)
     //println("traverse " + tree.toString)
     warts.foreach{ w =>
+      val universe = new WartUniverse(q, w)
       val traverser = w.apply(universe)
       traverser.traverse(tree.asInstanceOf[traverser.q.reflect.Tree])
     }

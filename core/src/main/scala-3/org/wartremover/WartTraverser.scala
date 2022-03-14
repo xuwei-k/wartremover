@@ -6,12 +6,26 @@ abstract class WartTraverser{
   def apply(u: WartUniverse): u.Traverser
 }
 
-trait WartUniverse {
-  val quotes: Quotes
-  abstract class Traverser extends org.wartremover.Traverser(quotes)
-}
+class WartUniverse(quotes: Quotes, traverser: WartTraverser) { self =>
+  abstract class Traverser {
+    private[this] def name = traverser.getClass.getSimpleName.dropRight(1)
 
-trait Traverser(val q: Quotes) {
-  protected final implicit def quotes: q.type = q
-  def traverse(tree: q.reflect.Tree): Unit
+    protected def messagePrefix = s"[wartremover:${name}] "
+    final implicit val q: Quotes = self.quotes
+
+    def traverse(tree: q.reflect.Tree): Unit
+
+    protected final def warning(u: WartUniverse)(message: String): Unit = {
+      q.reflect.report.warning(messagePrefix + message)
+    }
+    protected final def warning(u: WartUniverse)(message: String, pos: q.reflect.Position): Unit = {
+      q.reflect.report.warning(messagePrefix + message, pos)
+    }
+    protected final def error(u: WartUniverse)(message: String): Unit = {
+      q.reflect.report.error(messagePrefix + message)
+    }
+    protected final def error(u: WartUniverse)(message: String, pos: q.reflect.Position): Unit = {
+      q.reflect.report.error(messagePrefix + message, pos)
+    }
+  }
 }

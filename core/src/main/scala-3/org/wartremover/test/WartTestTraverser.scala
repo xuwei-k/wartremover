@@ -8,7 +8,7 @@ import dotty.tools.dotc.core.Contexts.Context
 import dotty.tools.dotc.quoted.PickledQuotes
 import dotty.tools.dotc.core.Contexts.FreshContext
 
-import scala.quoted.{Expr, FromExpr, Quotes, ToExpr}
+import scala.quoted.{Expr, FromExpr, Quotes, ToExpr, Type}
 import scala.quoted.runtime.impl.{ExprImpl, QuotesImpl}
 import dotty.tools.dotc.core.Contexts.Context
 import dotty.tools.dotc.reporting.{Diagnostic, Reporter}
@@ -47,15 +47,15 @@ object WartTestTraverser {
 
   inline def apply[A <: WartTraverser](inline t: A)(inline a: Any): Result = ${applyImpl[A](t = 't, expr = 'a)}
 
-  private[this] def applyImpl[A <: WartTraverser](t: Expr[A], expr: Expr[Any])(using q1: Quotes): Expr[Result] = {
+  private[this] def applyImpl[A <: WartTraverser: Type](t: Expr[A], expr: Expr[Any])(using q1: Quotes): Expr[Result] = {
     val q2 = q1.asInstanceOf[QuotesImpl]
     val reporter = new MyReporter
     q2.ctx.asInstanceOf[FreshContext].setReporter(reporter)
-    val clazz = Class.forName(t.show + NameTransformer.MODULE_SUFFIX_STRING)
-    val wart = clazz.getField(NameTransformer.MODULE_INSTANCE_NAME).get(null).asInstanceOf[WartTraverser]
-    val universe = new WartUniverse {
-      override val quotes = q1
+    val wart = Type.valueOfConstant[A].getOrElse {
+      val clazz = Class.forName(t.show + NameTransformer.MODULE_SUFFIX_STRING)
+      clazz.getField(NameTransformer.MODULE_INSTANCE_NAME).get(null).asInstanceOf[WartTraverser]
     }
+    val universe = new WartUniverse(q1, wart)
     val x: universe.Traverser = wart.apply(universe)
     val t2 = new x.q.reflect.TreeTraverser {
       override def traverseTree(tree: x.q.reflect.Tree)(owner: x.q.reflect.Symbol): Unit = {
