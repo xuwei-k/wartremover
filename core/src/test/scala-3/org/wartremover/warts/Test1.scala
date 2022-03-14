@@ -12,5 +12,10 @@ object Test1 {
     result.errors.foreach(println)
     result.warnings.foreach(println)
     assert(result.warnings.nonEmpty)
+    val res2 = WartTestTraverser(TestWart1){
+      object Foo extends scala.App
+    }
+    assert(res2.warnings.nonEmpty)
+    assert(res2.warnings.contains("do not extends scala.App"))
   }
 }
