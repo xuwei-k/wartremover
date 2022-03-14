@@ -6,9 +6,11 @@ import org.wartremover.test.WartTestTraverser
 object Test1 {
   def main(args: Array[String]): Unit = {
     val result = WartTestTraverser(TestWart1){
+      List(2, IArray(3))
       List(1, "a")
     }
-    println(result)
+    result.errors.foreach(println)
+    result.warnings.foreach(println)
     assert(result.warnings.nonEmpty)
   }
 }

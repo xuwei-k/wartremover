@@ -1,6 +1,6 @@
 package org.wartremover.test
 
-import org.wartremover.WartTraverser
+import org.wartremover.{WartTraverser, WartUniverse}
 import dotty.tools.dotc.ast.tpd
 import dotty.tools.dotc.ast.tpd.TypeTree
 import dotty.tools.dotc.ast.tpd.TreeTraverser
@@ -49,36 +49,24 @@ object WartTestTraverser {
 
   private[this] def applyImpl[A <: WartTraverser](t: Expr[A], expr: Expr[Any])(using q1: Quotes): Expr[Result] = {
     val q2 = q1.asInstanceOf[QuotesImpl]
-    val wart = Class.forName(t.show + NameTransformer.MODULE_SUFFIX_STRING)
     val reporter = new MyReporter
-    import q2.ctx
     q2.ctx.asInstanceOf[FreshContext].setReporter(reporter)
-    println(expr.show)
-    val traverser1 = new q1.reflect.TreeTraverser {
-      override def traverseTree(tree: q1.reflect.Tree)(owner: q1.reflect.Symbol): Unit = {
-        tree match {
-          case t: TypeTree =>
-            println(t.show)
-            q1.reflect.report.warning("aaa")
-          case _ =>
-        }
+    val clazz = Class.forName(t.show + NameTransformer.MODULE_SUFFIX_STRING)
+    val wart = clazz.getField(NameTransformer.MODULE_INSTANCE_NAME).get(null).asInstanceOf[WartTraverser]
+    val universe = new WartUniverse {
+      override val quotes = q1
+    }
+    val x: universe.Traverser = wart.apply(universe)
+    val t2 = new x.q.reflect.TreeTraverser {
+      override def traverseTree(tree: x.q.reflect.Tree)(owner: x.q.reflect.Symbol): Unit = {
+        x.traverse(tree)
         traverseTreeChildren(tree)(owner)
       }
     }
-    val tree = q1.reflect.asTerm(expr)
-    traverser1.traverseTree(tree)(tree.symbol)
 
-    val quoted = PickledQuotes.quotedExprToTree(expr)
-    val traverser = new TreeTraverser {
-      override def traverse(tree: tpd.Tree)(using Context): Unit = tree match {
-        case t: TypeTree =>
-        case _ =>
-          traverseChildren(tree)
-      }
-    }
-    traverser.apply((), quoted)
+    val term = x.q.reflect.asTerm(expr)
+    t2.traverseTree(term)(term.symbol)
     val result1 = reporter.result
-    println(result1)
     val warnings = result1.collect{ case a if a.level() == DiagnosticInterface.WARNING => a.message() }
     val errors = result1.collect{ case a if a.level() == DiagnosticInterface.ERROR => a.message() }
     Expr(Result(errors = errors, warnings = warnings))

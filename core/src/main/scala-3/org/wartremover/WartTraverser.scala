@@ -1,40 +1,17 @@
 package org.wartremover
 
-import dotty.tools.dotc.ast.tpd.*
-import dotty.tools.dotc.core.Contexts.Context
+import scala.quoted.Quotes
 
-abstract class WartTraverser {
-  def prepareForIdent(tree: Ident)(using ctx: Context): Unit = ()
-  def prepareForSelect(tree: Select)(using ctx: Context): Unit = ()
-  def prepareForThis(tree: This)(using ctx: Context): Unit = ()
-  def prepareForSuper(tree: Super)(using ctx: Context): Unit = ()
-  def prepareForApply(tree: Apply)(using ctx: Context): Unit = ()
-  def prepareForTypeApply(tree: TypeApply)(using ctx: Context): Unit = ()
-  def prepareForLiteral(tree: Literal)(using ctx: Context): Unit = ()
-  def prepareForNew(tree: New)(using ctx: Context): Unit = ()
-  def prepareForTyped(tree: Typed)(using ctx: Context): Unit = ()
-  def prepareForAssign(tree: Assign)(using ctx: Context): Unit = ()
-  def prepareForBlock(tree: Block)(using ctx: Context): Unit = ()
-  def prepareForIf(tree: If)(using ctx: Context): Unit = ()
-  def prepareForClosure(tree: Closure)(using ctx: Context): Unit = ()
-  def prepareForMatch(tree: Match)(using ctx: Context): Unit = ()
-  def prepareForCaseDef(tree: CaseDef)(using ctx: Context): Unit = ()
-  def prepareForLabeled(tree: Labeled)(using ctx: Context): Unit = ()
-  def prepareForReturn(tree: Return)(using ctx: Context): Unit = ()
-  def prepareForWhileDo(tree: WhileDo)(using ctx: Context): Unit = ()
-  def prepareForTry(tree: Try)(using ctx: Context): Unit = ()
-  def prepareForSeqLiteral(tree: SeqLiteral)(using ctx: Context): Unit = ()
-  def prepareForInlined(tree: Inlined)(using ctx: Context): Unit = ()
-  def prepareForTypeTree(tree: TypeTree)(using ctx: Context): Unit = ()
-  def prepareForBind(tree: Bind)(using ctx: Context): Unit = ()
-  def prepareForAlternative(tree: Alternative)(using ctx: Context): Unit = ()
-  def prepareForUnApply(tree: UnApply)(using ctx: Context): Unit = ()
-  def prepareForValDef(tree: ValDef)(using ctx: Context): Unit = ()
-  def prepareForDefDef(tree: DefDef)(using ctx: Context): Unit = ()
-  def prepareForTypeDef(tree: TypeDef)(using ctx: Context): Unit = ()
-  def prepareForTemplate(tree: Template)(using ctx: Context): Unit = ()
-  def prepareForPackageDef(tree: PackageDef)(using ctx: Context): Unit = ()
-  def prepareForStats(trees: List[Tree])(using ctx: Context): Unit = ()
-  def prepareForUnit(tree: Tree)(using ctx: Context): Unit = ()
-  def prepareForOther(tree: Tree)(using ctx: Context): Unit = ()
+abstract class WartTraverser{
+  def apply(u: WartUniverse): u.Traverser
+}
+
+trait WartUniverse {
+  val quotes: Quotes
+  abstract class Traverser extends org.wartremover.Traverser(quotes)
+}
+
+trait Traverser(val q: Quotes) {
+  protected final implicit def quotes: q.type = q
+  def traverse(tree: q.reflect.Tree): Unit
 }
