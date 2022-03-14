@@ -4,6 +4,8 @@ import xsbti.api.{ClassLike, DefinitionType}
 import scala.reflect.NameTransformer
 import java.lang.reflect.Modifier
 
+def Scala3 = "3.2.0-RC1-bin-20220308-29073f1-NIGHTLY"
+
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
 // compiler plugin should be fully cross-versioned. e.g.
@@ -125,7 +127,7 @@ def crossSrcSetting(c: Configuration) = {
 
 val coreSettings = Def.settings(
   commonSettings,
-  scalaVersion := "3.1.1",
+  scalaVersion := Scala3,
   name := "wartremover",
   Test / fork := true,
   crossScalaVersions := allScalaVersions,
@@ -277,7 +279,7 @@ lazy val testMacros: Project = Project(
   base = file("test-macros")
 ).settings(
   baseSettings,
-  scalaVersion := "3.1.1",
+  scalaVersion := Scala3,
   crossScalaVersions := allScalaVersions,
   publish / skip := true,
   publishArtifact := false,

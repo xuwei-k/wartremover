@@ -55,15 +55,8 @@ object WartTestTraverser {
     }
     val universe = new WartUniverse(q1, wart)
     val x: universe.Traverser = wart.apply(universe)
-    val t2 = new x.q.reflect.TreeTraverser {
-      override def traverseTree(tree: x.q.reflect.Tree)(owner: x.q.reflect.Symbol): Unit = {
-        x.traverse(tree)
-        traverseTreeChildren(tree)(owner)
-      }
-    }
-
     val term = x.q.reflect.asTerm(expr)
-    t2.traverseTree(term)(term.symbol)
+    x.traverseTree(term)(term.symbol)
     val result1 = reporter.result
     val warnings = result1.collect{ case a if a.level() == DiagnosticInterface.WARNING => a.message() }
     val errors = result1.collect{ case a if a.level() == DiagnosticInterface.ERROR => a.message() }

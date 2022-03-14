@@ -80,7 +80,14 @@ class InferenceMatchablePhase(warts: List[WartTraverser]) extends PluginPhase {
     warts.foreach{ w =>
       val universe = new WartUniverse(q, w)
       val traverser = w.apply(universe)
-      traverser.traverse(tree.asInstanceOf[traverser.q.reflect.Tree])
+      val t = tree.asInstanceOf[traverser.q.reflect.Tree]
+      try {
+        traverser.traverseTree(t)(t.symbol)
+      } catch {
+        case e: MatchError =>
+          // TODO
+          println(e)
+      }
     }
     c
   }
