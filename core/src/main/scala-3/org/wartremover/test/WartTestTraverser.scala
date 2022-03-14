@@ -7,17 +7,15 @@ import dotty.tools.dotc.ast.tpd.TreeTraverser
 import dotty.tools.dotc.core.Contexts.Context
 import dotty.tools.dotc.quoted.PickledQuotes
 import dotty.tools.dotc.core.Contexts.FreshContext
-
-import scala.quoted.{Expr, FromExpr, Quotes, ToExpr, Type}
-import scala.quoted.runtime.impl.{ExprImpl, QuotesImpl}
 import dotty.tools.dotc.core.Contexts.Context
 import dotty.tools.dotc.reporting.{Diagnostic, Reporter}
 import dotty.tools.dotc.interfaces.Diagnostic as DiagnosticInterface
-
 import scala.collection.mutable.ListBuffer
+import scala.quoted.{Expr, FromExpr, Quotes, ToExpr, Type}
+import scala.quoted.runtime.impl.{ExprImpl, QuotesImpl}
 import scala.reflect.NameTransformer
 
-class MyReporter extends Reporter{
+class WartReporter extends Reporter{
   private[this] val lock = new Object
   private[this] val values = ListBuffer.empty[Diagnostic]
   override def doReport(diagnostic: Diagnostic)(using Context): Unit = {
@@ -49,7 +47,7 @@ object WartTestTraverser {
 
   private[this] def applyImpl[A <: WartTraverser: Type](t: Expr[A], expr: Expr[Any])(using q1: Quotes): Expr[Result] = {
     val q2 = q1.asInstanceOf[QuotesImpl]
-    val reporter = new MyReporter
+    val reporter = new WartReporter
     q2.ctx.asInstanceOf[FreshContext].setReporter(reporter)
     val wart = Type.valueOfConstant[A].getOrElse {
       val clazz = Class.forName(t.show + NameTransformer.MODULE_SUFFIX_STRING)
