@@ -22,6 +22,8 @@ class A {
     case _ =>
       2
   }
+
+  def x5 = List(IArray(3), false)
 }
 
 // ScalaApp
