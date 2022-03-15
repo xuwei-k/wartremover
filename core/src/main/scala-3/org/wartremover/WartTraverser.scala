@@ -1,12 +1,29 @@
 package org.wartremover
 
+import dotty.tools.dotc.ast.tpd.InferredTypeTree
 import scala.quoted.Quotes
+import scala.quoted.Type
 
 abstract class WartTraverser{
   def apply(u: WartUniverse): u.Traverser
 }
 
 class WartUniverse(val quotes: Quotes, traverser: WartTraverser) { self =>
+  class ForbidInferenceTraverser[A: Type] extends Traverser {
+    import quotes.reflect.*
+    private[this] val A = TypeRepr.of[A]
+    override def traverseTree(tree: Tree)(owner: Symbol): Unit = {
+      tree match {
+        case _ if hasWartAnnotation(tree) =>
+        case a: Inferred if a.tpe =:= A && a.isInstanceOf[InferredTypeTree] =>
+          val name = A.show.split('.').last // TODO
+          error(self)(s"Inferred type containing ${name}: ${name}", tree.pos)
+        case _ =>
+          super.traverseTree(tree)(owner)
+      }
+    }
+  }
+
   abstract class Traverser extends quotes.reflect.TreeTraverser {
     private[this] def name = traverser.getClass.getSimpleName.dropRight(1)
 
