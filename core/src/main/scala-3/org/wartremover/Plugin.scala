@@ -7,7 +7,7 @@ import dotty.tools.dotc.core.Symbols.defn
 import dotty.tools.dotc.plugins.{PluginPhase, StandardPlugin}
 import dotty.tools.dotc.quoted.{PickledQuotes, QuotesCache}
 import dotty.tools.dotc.typer.TyperPhase
-
+import dotty.tools.dotc.report
 import scala.quoted.Quotes
 import scala.reflect.NameTransformer
 
@@ -27,13 +27,10 @@ class Plugin extends StandardPlugin {
   override def init(options: List[String]): List[PluginPhase] = {
     val errorWarts = options.collect {
       case s"traverser:${name}" =>
-        println("load " + name + " for error")
         loadWart(name)
     }
-
     val warningWarts = options.collect {
       case s"only-warn-traverser:${name}" =>
-        println("load " + name + " for warn")
         loadWart(name)
     }
     val newPhase = new InferenceMatchablePhase(
@@ -46,6 +43,12 @@ class Plugin extends StandardPlugin {
 
 class InferenceMatchablePhase(errorWarts: List[WartTraverser], warningWarts: List[WartTraverser]) extends PluginPhase {
   override def phaseName = "wartremover"
+
+  override def run(using Context): Unit = {
+    report.echo("error warts = " + errorWarts.map(_.getClass.getName).mkString(", "))
+    report.echo("warning warts = " + warningWarts.map(_.getClass.getName).mkString(", "))
+    super.run
+  }
 
   override val runsAfter = Set(TyperPhase.name)
 

@@ -131,6 +131,12 @@ val coreSettings = Def.settings(
   name := "wartremover",
   Test / fork := true,
   crossScalaVersions := allScalaVersions,
+  TaskKey[Unit]("compileScala3TestStandalone") := {
+    val _ = publishLocal.value
+    val dir = (LocalRootProject / baseDirectory).value / "scala-3-test"
+    val home = scala.util.Properties.userHome
+    sys.process.Process(Seq("java", "-jar", s"${home}/.sbt/launchers/1.6.2/sbt-launch.jar", "clean", "compile"), dir).!
+  },
   Test / scalacOptions ++= {
     if (scalaBinaryVersion.value == "3") {
       Seq("-source:3.0-migration")
