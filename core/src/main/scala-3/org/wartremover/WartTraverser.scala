@@ -16,8 +16,8 @@ class WartUniverse(val quotes: Quotes, traverser: WartTraverser) { self =>
       tree match {
         case _ if hasWartAnnotation(tree) =>
         case a: Inferred if a.tpe =:= A && a.isInstanceOf[InferredTypeTree] =>
-          val name = A.show.split('.').last // TODO
-          error(self)(s"Inferred type containing ${name}: ${name}", tree.pos)
+          val name = A.show.split('.').last // TODO more better way
+          error(self)(tree.pos, s"Inferred type containing ${name}: ${name}")
         case _ =>
           super.traverseTree(tree)(owner)
       }
@@ -40,16 +40,10 @@ class WartUniverse(val quotes: Quotes, traverser: WartTraverser) { self =>
       }
     }
 
-    protected final def warning(u: WartUniverse)(message: String): Unit = {
-      report.warning(messagePrefix + message)
-    }
-    protected final def warning(u: WartUniverse)(message: String, pos: Position): Unit = {
+    protected final def warning(u: WartUniverse)(pos: Position, message: String): Unit = {
       report.warning(messagePrefix + message, pos)
     }
-    protected final def error(u: WartUniverse)(message: String): Unit = {
-      report.error(messagePrefix + message)
-    }
-    protected final def error(u: WartUniverse)(message: String, pos: Position): Unit = {
+    protected final def error(u: WartUniverse)(pos: Position, message: String): Unit = {
       report.error(messagePrefix + message, pos)
     }
   }

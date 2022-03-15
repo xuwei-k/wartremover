@@ -11,7 +11,7 @@ object Var extends WartTraverser {
         tree match {
           case t if hasWartAnnotation(t) =>
           case t: ValDef if t.symbol.flags.is(Flags.Mutable) =>
-            error(u)("var is disabled", t.pos)
+            error(u)(t.pos, "var is disabled")
           case _ =>
             super.traverseTree(tree)(owner)
         }
