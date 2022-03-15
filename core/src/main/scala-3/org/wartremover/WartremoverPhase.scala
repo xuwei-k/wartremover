@@ -37,7 +37,6 @@ class WartremoverPhase(
   override def prepareForTypeApply(tree: TypeApply)(using Context): Context = wartTraverse(tree)
   override def prepareForLiteral(tree: Literal)(using Context): Context = wartTraverse(tree)
   override def prepareForNew(tree: New)(using Context): Context = wartTraverse(tree)
-  override def prepareForTyped(tree: Typed)(using Context): Context = wartTraverse(tree)
   override def prepareForAssign(tree: Assign)(using Context): Context = wartTraverse(tree)
   override def prepareForBlock(tree: Block)(using Context): Context = wartTraverse(tree)
   override def prepareForIf(tree: If)(using Context): Context = wartTraverse(tree)
@@ -69,6 +68,9 @@ class WartremoverPhase(
   // TODO
   //  override def prepareForStats(trees: List[Tree])(using Context): Context = wartTraverse(tree)
 
+  // always MatchError ???
+  // override def prepareForTyped(tree: Typed)(using Context): Context = wartTraverse(tree)
+
   override def prepareForUnit(tree: Tree)(using Context): Context = wartTraverse(tree)
   override def prepareForOther(tree: Tree)(using Context): Context = wartTraverse(tree)
 
@@ -90,7 +92,7 @@ class WartremoverPhase(
             case _: Template => // ignore
             case _ =>
               // TODO use debug level?
-              println(s"MatchError ${tree.getClass}")
+              println(s"MatchError ${w.getClass.getSimpleName.replace("$", "")} ${tree.getClass}")
           }
       }
     }

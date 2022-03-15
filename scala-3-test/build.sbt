@@ -4,6 +4,7 @@ scalacOptions ++= {
   Seq(
     "NoooooootExistsWartName",
     "Var",
+    "ListUnapply",
     "ArrayEquals",
     "Return",
     "ScalaApp",
