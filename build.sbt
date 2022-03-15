@@ -131,6 +131,13 @@ val coreSettings = Def.settings(
   name := "wartremover",
   Test / fork := true,
   crossScalaVersions := allScalaVersions,
+  Test / scalacOptions ++= {
+    if (scalaBinaryVersion.value == "3") {
+      Seq("-source:3.0-migration")
+    } else {
+      Seq()
+    }
+  },
   libraryDependencies := {
     CrossVersion.partialVersion(scalaVersion.value) match {
       case Some((2, v)) if v >= 13 =>
