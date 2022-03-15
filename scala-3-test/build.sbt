@@ -2,6 +2,7 @@ addCompilerPlugin("org.wartremover" % "wartremover" % "2.4.19-SNAPSHOT" cross Cr
 
 scalacOptions ++= {
   Seq(
+    "NoooooootExistsWartName",
     "Var",
     "ArrayEquals",
     "Return",
