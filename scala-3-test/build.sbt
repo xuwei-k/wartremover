@@ -1,5 +1,14 @@
 addCompilerPlugin("org.wartremover" % "wartremover" % "2.4.19-SNAPSHOT" cross CrossVersion.full)
 
-scalacOptions += "-P:wartremover:traverser:org.wartremover.warts.AnyVal"
+scalacOptions ++= {
+  Seq(
+    "Var",
+    "ArrayEquals",
+    "Return",
+    "ScalaApp",
+    "AnyVal",
+    "While",
+  ).map("-P:wartremover:only-warn-traverser:org.wartremover.warts." + _)
+}
 
-scalaVersion := "3.2.0-RC1-bin-20220308-29073f1-NIGHTLY"
+scalaVersion := "3.1.1"

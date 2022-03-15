@@ -9,7 +9,7 @@ abstract class WartTraverser{
   def apply(u: WartUniverse): u.Traverser
 }
 
-class WartUniverse(val quotes: Quotes, traverser: WartTraverser) { self =>
+class WartUniverse(val quotes: Quotes, traverser: WartTraverser, onlyWarning: Boolean) { self =>
   class ForbidInferenceTraverser[A: Type] extends Traverser {
     import quotes.reflect.*
     private[this] val A = TypeRepr.of[A]
@@ -46,7 +46,11 @@ class WartUniverse(val quotes: Quotes, traverser: WartTraverser) { self =>
       report.warning(messagePrefix + message, pos)
     }
     protected final def error(u: WartUniverse)(pos: Position, message: String): Unit = {
-      report.error(messagePrefix + message, pos)
+      if (onlyWarning) {
+        report.warning(messagePrefix + message, pos)
+      } else {
+        report.error(messagePrefix + message, pos)
+      }
     }
   }
 }

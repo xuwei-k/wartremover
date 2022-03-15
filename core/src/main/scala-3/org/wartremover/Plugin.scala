@@ -16,21 +16,35 @@ class Plugin extends StandardPlugin {
 
   override def description = "wartremover"
 
+  private def loadWart(name: String) = {
+    val clazz = Class.forName(name + NameTransformer.MODULE_SUFFIX_STRING)
+    val field = clazz.getField(NameTransformer.MODULE_INSTANCE_NAME)
+    field.setAccessible(true)
+    val instance = field.get(null)
+    instance.asInstanceOf[WartTraverser]
+  }
+
   override def init(options: List[String]): List[PluginPhase] = {
-    val warts = options.collect{
+    val errorWarts = options.collect {
       case s"traverser:${name}" =>
-        println("load " + name)
-        val clazz = Class.forName(name + NameTransformer.MODULE_SUFFIX_STRING)
-        val field = clazz.getField(NameTransformer.MODULE_INSTANCE_NAME)
-        field.setAccessible(true)
-        val instance = field.get(null)
-        instance.asInstanceOf[WartTraverser]
+        println("load " + name + " for error")
+        loadWart(name)
     }
-    (new InferenceMatchablePhase(warts)) :: Nil
+
+    val warningWarts = options.collect {
+      case s"only-warn-traverser:${name}" =>
+        println("load " + name + " for warn")
+        loadWart(name)
+    }
+    val newPhase = new InferenceMatchablePhase(
+      errorWarts = errorWarts,
+      warningWarts = warningWarts
+    )
+    newPhase :: Nil
   }
 }
 
-class InferenceMatchablePhase(warts: List[WartTraverser]) extends PluginPhase {
+class InferenceMatchablePhase(errorWarts: List[WartTraverser], warningWarts: List[WartTraverser]) extends PluginPhase {
   override def phaseName = "wartremover"
 
   override val runsAfter = Set(TyperPhase.name)
@@ -77,18 +91,24 @@ class InferenceMatchablePhase(warts: List[WartTraverser]) extends PluginPhase {
     val q = scala.quoted.runtime.impl.QuotesImpl()(using c2)
     //println(warts.size)
     //println("traverse " + tree.toString)
-    warts.foreach{ w =>
-      val universe = new WartUniverse(q, w)
+
+    def runWart(w: WartTraverser, onlyWarning: Boolean): Unit = {
+      val universe = new WartUniverse(q, w, onlyWarning = onlyWarning)
       val traverser = w.apply(universe)
       val t = tree.asInstanceOf[traverser.q.reflect.Tree]
       try {
         traverser.traverseTree(t)(t.symbol)
       } catch {
         case e: MatchError =>
-          // TODO
-          println(e)
+          // TODO use debug level?
+          println(s"MatchError ${tree.getClass}")
       }
     }
+
+    errorWarts.foreach(w => runWart(w = w, onlyWarning = false))
+    warningWarts.foreach(w => runWart(w = w, onlyWarning = true))
     c
   }
+
+
 }

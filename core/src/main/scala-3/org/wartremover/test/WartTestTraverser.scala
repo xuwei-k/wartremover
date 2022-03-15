@@ -53,7 +53,7 @@ object WartTestTraverser {
       val clazz = Class.forName(t.show + NameTransformer.MODULE_SUFFIX_STRING)
       clazz.getField(NameTransformer.MODULE_INSTANCE_NAME).get(null).asInstanceOf[WartTraverser]
     }
-    val universe = new WartUniverse(q1, wart)
+    val universe = new WartUniverse(q1, wart, onlyWarning = false)
     val x: universe.Traverser = wart.apply(universe)
     val term = x.q.reflect.asTerm(expr)
     x.traverseTree(term)(term.symbol)
