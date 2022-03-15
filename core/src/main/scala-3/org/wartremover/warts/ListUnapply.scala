@@ -15,11 +15,9 @@ object ListUnapply extends WartTraverser {
       val List(consUnapply) = TypeRepr.of[scala.collection.immutable.::.type].typeSymbol.methodMember("unapply")
 
       def isListConsUnapply(t: Tree): Boolean = {
-        t match {
-          case t @ TypedOrTest(unapp @ Unapply(f: TypeApply, i, patterns), tpt) if f.fun.symbol == consUnapply =>
-            true
-          case _ =>
-            false
+        PartialFunction.cond(t) {
+          case t @ TypedOrTest(unapp @ Unapply(f: TypeApply, i, patterns), tpt) =>
+            f.fun.symbol == consUnapply
         }
       }
 
