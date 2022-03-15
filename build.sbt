@@ -4,7 +4,7 @@ import xsbti.api.{ClassLike, DefinitionType}
 import scala.reflect.NameTransformer
 import java.lang.reflect.Modifier
 
-def Scala3 = "3.2.0-RC1-bin-20220308-29073f1-NIGHTLY"
+def Scala3 = "3.1.1"
 
 Global / onChangedBuildSource := ReloadOnSourceChanges
 

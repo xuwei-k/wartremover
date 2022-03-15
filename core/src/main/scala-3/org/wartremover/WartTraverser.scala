@@ -3,6 +3,7 @@ package org.wartremover
 import dotty.tools.dotc.ast.tpd.InferredTypeTree
 import scala.quoted.Quotes
 import scala.quoted.Type
+import scala.annotation.nowarn
 
 abstract class WartTraverser{
   def apply(u: WartUniverse): u.Traverser
@@ -12,6 +13,7 @@ class WartUniverse(val quotes: Quotes, traverser: WartTraverser) { self =>
   class ForbidInferenceTraverser[A: Type] extends Traverser {
     import quotes.reflect.*
     private[this] val A = TypeRepr.of[A]
+    @nowarn("msg=cannot be checked at runtime")
     override def traverseTree(tree: Tree)(owner: Symbol): Unit = {
       tree match {
         case _ if hasWartAnnotation(tree) =>
