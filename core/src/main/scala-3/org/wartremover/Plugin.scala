@@ -74,7 +74,13 @@ class InferenceMatchablePhase(errorWarts: List[WartTraverser], warningWarts: Lis
   override def prepareForBind(tree: Bind)(using Context): Context = wartTraverse(tree)
   override def prepareForAlternative(tree: Alternative)(using Context): Context = wartTraverse(tree)
   override def prepareForUnApply(tree: UnApply)(using Context): Context = wartTraverse(tree)
-  override def prepareForValDef(tree: ValDef)(using Context): Context = wartTraverse(tree)
+  override def prepareForValDef(tree: ValDef)(using c: Context): Context = {
+    if (tree.isEmpty) {
+      c
+    } else {
+      wartTraverse(tree)
+    }
+  }
   override def prepareForDefDef(tree: DefDef)(using Context): Context = wartTraverse(tree)
   override def prepareForTypeDef(tree: TypeDef)(using Context): Context = wartTraverse(tree)
   override def prepareForTemplate(tree: Template)(using Context): Context = wartTraverse(tree)
@@ -100,8 +106,12 @@ class InferenceMatchablePhase(errorWarts: List[WartTraverser], warningWarts: Lis
         traverser.traverseTree(t)(t.symbol)
       } catch {
         case e: MatchError =>
-          // TODO use debug level?
-          println(s"MatchError ${tree.getClass}")
+          tree match {
+            case _: Template => // ignore
+            case _ =>
+              // TODO use debug level?
+              println(s"MatchError ${tree.getClass}")
+          }
       }
     }
 
