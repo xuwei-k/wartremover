@@ -10,8 +10,8 @@ object Throw extends WartTraverser {
           case t if hasWartAnnotation(t) =>
           case t if t.isExpr =>
             t.asExpr match {
-              case '{ $x } =>
-                x
+              case '{ throw $x } if t.pos.sourceCode.exists(_.contains("throw")) =>
+                error(u)(tree.pos, "throw is disabled")
               case _ =>
                 super.traverseTree(tree)(owner)
             }
