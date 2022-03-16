@@ -12,6 +12,14 @@ class Option2IterableTest extends AnyFunSuite with ResultAssertions {
     v.matches("2\\.1[012].*")
   }
 
+  test("can't use Option.option2Iterable") {
+    val result = WartTestTraverser(Option2Iterable) {
+      Option(2): Iterable[Int]
+    }
+
+    assertError(result)("Implicit conversion from Option to Iterable is disabled - use Option#toList instead")
+  }
+
   test("can't use Option.option2Iterable with Some") {
     val result = WartTestTraverser(Option2Iterable) {
       println(Iterable(1).flatMap(Some(_)))
@@ -20,6 +28,8 @@ class Option2IterableTest extends AnyFunSuite with ResultAssertions {
     // https://github.com/scala/scala/pull/8038
     if (isScala212) {
       assertError(result)("Implicit conversion from Option to Iterable is disabled - use Option#toList instead")
+    } else {
+      assertEmpty(result)
     }
   }
   test("can't use Option.option2Iterable with None") {
@@ -30,6 +40,8 @@ class Option2IterableTest extends AnyFunSuite with ResultAssertions {
     // https://github.com/scala/scala/pull/8038
     if (isScala212) {
       assertError(result)("Implicit conversion from Option to Iterable is disabled - use Option#toList instead")
+    } else {
+      assertEmpty(result)
     }
   }
   test("can't use Option.option2Iterable when zipping Options") {
