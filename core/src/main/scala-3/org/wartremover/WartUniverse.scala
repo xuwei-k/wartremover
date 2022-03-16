@@ -6,8 +6,8 @@ import java.lang.SuppressWarnings
 
 class WartUniverse(val quotes: Quotes, traverser: WartTraverser, onlyWarning: Boolean) { self =>
   abstract class Traverser extends quotes.reflect.TreeTraverser {
-    private[this] def simpleName = traverser.getClass.getSimpleName.dropRight(1)
-    private[this] def fullName = traverser.getClass.getName.dropRight(1)
+    private[this] def simpleName: String = traverser.getClass.getSimpleName.dropRight(1)
+    private[this] def fullName: String = traverser.getClass.getName.dropRight(1)
 
     protected def messagePrefix = s"[wartremover:${simpleName}] "
     final implicit val q: self.quotes.type = self.quotes

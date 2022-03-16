@@ -125,13 +125,16 @@ def crossSrcSetting(c: Configuration) = {
   }
 }
 
+val compileScala3TestStandalone = taskKey[Int]("")
+
 val coreSettings = Def.settings(
   commonSettings,
   scalaVersion := Scala3,
   name := "wartremover",
   Test / fork := true,
   crossScalaVersions := allScalaVersions,
-  TaskKey[Unit]("compileScala3TestStandalone") := {
+  TaskKey[Int]("testAll") := Def.sequential(clean, (Test / test), compileScala3TestStandalone).value,
+  compileScala3TestStandalone := {
     val _ = publishLocal.value
     val dir = (LocalRootProject / baseDirectory).value / "scala-3-test"
     val home = scala.util.Properties.userHome
