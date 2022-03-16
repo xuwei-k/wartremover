@@ -26,10 +26,19 @@ class WartUniverse(val quotes: Quotes, traverser: WartTraverser, onlyWarning: Bo
 
       args.contains(fullName) || args("org.wartremover.warts.All")
     }
-
+    override protected def traverseTreeChildren(tree: Tree)(owner: Symbol): Unit = {
+      try {
+        super.traverseTreeChildren(tree)(owner)
+      } catch {
+        case e: MatchError =>
+          warning(self)(tree.pos, s"MatchError ${tree.getClass} ${owner.getClass}")
+      }
+    }
+    // TODO remove Universe param?
     protected final def warning(u: WartUniverse)(pos: Position, message: String): Unit = {
       report.warning(messagePrefix + message, pos)
     }
+    // TODO remove Universe param?
     protected final def error(u: WartUniverse)(pos: Position, message: String): Unit = {
       if (onlyWarning) {
         report.warning(messagePrefix + message, pos)

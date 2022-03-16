@@ -84,17 +84,7 @@ class WartremoverPhase(
       val universe = new WartUniverse(q, w, onlyWarning = onlyWarning)
       val traverser = w.apply(universe)
       val t = tree.asInstanceOf[traverser.q.reflect.Tree]
-      try {
-        traverser.traverseTree(t)(t.symbol)
-      } catch {
-        case e: MatchError =>
-          tree match {
-            case _: Template => // ignore
-            case _ =>
-              // TODO use debug level?
-              println(s"MatchError ${w.getClass.getSimpleName.replace("$", "")} ${tree.getClass}")
-          }
-      }
+      traverser.traverseTree(t)(t.symbol)
     }
 
     errorWarts.foreach(w => runWart(w = w, onlyWarning = false))
