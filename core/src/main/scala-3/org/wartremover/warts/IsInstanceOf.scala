@@ -10,11 +10,12 @@ object IsInstanceOf extends WartTraverser {
           case t if hasWartAnnotation(t) =>
           case t if t.isExpr =>
             t.asExpr match {
-              case '{ $x } =>
-                x
+              case '{ ($x: t1).isInstanceOf[t2] } if t.pos.sourceCode.exists(_.contains("isInstanceOf")) =>
+                error(u)(tree.pos, "isInstanceOf is disabled")
               case _ =>
                 super.traverseTree(tree)(owner)
             }
+          case _: TypedOrTest =>
           case _ =>
             super.traverseTree(tree)(owner)
         }
