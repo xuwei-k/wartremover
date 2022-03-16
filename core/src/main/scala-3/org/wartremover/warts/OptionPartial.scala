@@ -10,8 +10,8 @@ object OptionPartial extends WartTraverser {
           case t if hasWartAnnotation(t) =>
           case t if t.isExpr =>
             t.asExpr match {
-              case '{ $x } =>
-                x
+              case '{ ($x: Option[t]).get } =>
+                error(u)(tree.pos, "Option#get is disabled - use Option#fold instead")
               case _ =>
                 super.traverseTree(tree)(owner)
             }
