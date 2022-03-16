@@ -132,6 +132,13 @@ val coreSettings = Def.settings(
   scalaVersion := Scala3,
   name := "wartremover",
   Test / fork := true,
+  Test / scalacOptions += {
+    val hash = (Compile / sources).value.map { f =>
+      sbt.internal.inc.HashUtil.farmHash(f.toPath)
+    }.sum
+    println(hash)
+    s"-Ddummy-compile-hash=${hash}"
+  },
   crossScalaVersions := allScalaVersions,
   TaskKey[Int]("testAll") := Def.sequential(clean, (Test / test), compileScala3TestStandalone).value,
   compileScala3TestStandalone := {
