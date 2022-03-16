@@ -10,8 +10,8 @@ object AsInstanceOf extends WartTraverser {
           case t if hasWartAnnotation(t) =>
           case t if t.isExpr =>
             t.asExpr match {
-              case '{ $x } =>
-                x
+              case '{ ($x: t1).asInstanceOf[t2] } =>
+                error(u)(tree.pos, "asInstanceOf is disabled")
               case _ =>
                 super.traverseTree(tree)(owner)
             }
