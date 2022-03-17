@@ -1,6 +1,8 @@
 package org.wartremover
 package warts
 
+import scala.concurrent.ExecutionContext
+
 object GlobalExecutionContext extends WartTraverser {
   private[wartremover] def message = "Don't use ExecutionContext.global"
 
@@ -12,7 +14,7 @@ object GlobalExecutionContext extends WartTraverser {
           case t if hasWartAnnotation(t) =>
           case t if t.isExpr =>
             t.asExpr match {
-              case '{ scala.concurrent.ExecutionContext.global } | '{ scala.concurrent.ExecutionContext.Implicits.global } =>
+              case '{ ExecutionContext.global } | '{ ExecutionContext.Implicits.global } =>
                 error(u)(tree.pos, message)
               case _ =>
                 super.traverseTree(tree)(owner)
