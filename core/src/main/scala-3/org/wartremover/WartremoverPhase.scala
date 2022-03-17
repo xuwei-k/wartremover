@@ -11,17 +11,22 @@ import dotty.tools.dotc.report
 import scala.quoted.Quotes
 import scala.reflect.NameTransformer
 
+object WartremoverPhase {
+  
+}
+
 class WartremoverPhase(
   errorWarts: List[WartTraverser],
   warningWarts: List[WartTraverser],
-  loadFailureWarts: List[(String, Throwable)]
+  loadFailureWarts: List[(String, Throwable)],
+  excluded: List[String]
 ) extends PluginPhase {
   override def phaseName = "wartremover"
 
   override def run(using Context): Unit = {
-    report.echo("error warts = " + errorWarts.map(_.getClass.getName).mkString(", "))
-    report.echo("warning warts = " + warningWarts.map(_.getClass.getName).mkString(", "))
-    if(loadFailureWarts.nonEmpty) {
+    report.echo("error warts = " + errorWarts.map(_.getClass.getName.dropRight(1)).mkString(", "))
+    report.echo("warning warts = " + warningWarts.map(_.getClass.getName.dropRight(1)).mkString(", "))
+    if (loadFailureWarts.nonEmpty) {
       report.warning(s"load failure warts = " + loadFailureWarts.mkString(", "))
     }
     super.run
