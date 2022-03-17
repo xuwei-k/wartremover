@@ -13,7 +13,14 @@ class WartUniverse(val quotes: Quotes, traverser: WartTraverser, onlyWarning: Bo
     final implicit val q: self.quotes.type = self.quotes
     import q.reflect.*
     def hasWartAnnotation(t: Tree): Boolean = {
-      val args: Set[String] = t.symbol.getAnnotation(TypeTree.of[SuppressWarnings].symbol).collect {
+      hasWartAnnotationSymbol(t.symbol) || Option(t.symbol.maybeOwner).filterNot(_.isNoSymbol).filter(
+        s =>
+          s.isClassDef || s.isValDef || s.isDefDef
+      ).exists(hasWartAnnotationSymbol)
+    }
+    private[this] val SuppressWarningsSymbol = TypeTree.of[SuppressWarnings].symbol
+    private[this] def hasWartAnnotationSymbol(s: Symbol): Boolean = {
+      val args: Set[String] = s.getAnnotation(SuppressWarningsSymbol).collect {
         case a1 if a1.isExpr =>
           PartialFunction.condOpt(a1.asExpr) {
             case '{ new SuppressWarnings($a2: Array[String]) } =>
