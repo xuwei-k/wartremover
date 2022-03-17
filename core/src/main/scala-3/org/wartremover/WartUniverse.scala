@@ -1,5 +1,6 @@
 package org.wartremover
 
+import dotty.tools.dotc.ast.tpd
 import scala.quoted.Quotes
 import scala.quoted.Type
 import java.lang.SuppressWarnings
@@ -35,7 +36,12 @@ class WartUniverse(val quotes: Quotes, traverser: WartTraverser, onlyWarning: Bo
     }
     override protected def traverseTreeChildren(tree: Tree)(owner: Symbol): Unit = {
       try {
-        super.traverseTreeChildren(tree)(owner)
+        tree match {
+          case _: tpd.Template =>
+          case _: tpd.Typed =>
+          case _ =>
+            super.traverseTreeChildren(tree)(owner)
+        }
       } catch {
         case e: MatchError =>
           warning(self)(tree.pos, s"MatchError ${tree.getClass} ${owner.getClass}")
