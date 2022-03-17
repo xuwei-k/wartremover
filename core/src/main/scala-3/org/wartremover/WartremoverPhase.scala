@@ -67,13 +67,13 @@ class WartremoverPhase(
   }
   override def prepareForDefDef(tree: DefDef)(using Context): Context = wartTraverse(tree)
   override def prepareForTypeDef(tree: TypeDef)(using Context): Context = wartTraverse(tree)
-  override def prepareForTemplate(tree: Template)(using Context): Context = wartTraverse(tree)
   override def prepareForPackageDef(tree: PackageDef)(using Context): Context = wartTraverse(tree)
 
   // TODO
   //  override def prepareForStats(trees: List[Tree])(using Context): Context = wartTraverse(tree)
 
   // always MatchError ???
+  // override def prepareForTemplate(tree: Template)(using Context): Context = wartTraverse(tree)
   // override def prepareForTyped(tree: Typed)(using Context): Context = wartTraverse(tree)
 
   override def prepareForUnit(tree: Tree)(using Context): Context = wartTraverse(tree)
