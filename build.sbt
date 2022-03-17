@@ -142,7 +142,8 @@ val coreSettings = Def.settings(
   crossScalaVersions := allScalaVersions,
   TaskKey[Int]("testAll") := Def.sequential(clean, (Test / test), compileScala3TestStandalone).value,
   compileScala3TestStandalone := {
-    val _ = publishLocal.value
+    publishLocal.value
+    (LocalProject("sbt-plugin") / publishLocal).value
     val dir = (LocalRootProject / baseDirectory).value / "scala-3-test"
     val home = scala.util.Properties.userHome
     sys.process.Process(Seq("java", "-jar", s"${home}/.sbt/launchers/1.6.2/sbt-launch.jar", "clean", "compile"), dir).!
