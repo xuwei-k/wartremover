@@ -34,13 +34,13 @@ class WartUniverse(val quotes: Quotes, traverser: WartTraverser, onlyWarning: Bo
 
       args.contains(fullName) || args("org.wartremover.warts.All")
     }
-    override protected def traverseTreeChildren(tree: Tree)(owner: Symbol): Unit = {
+    override def foldOverTree(x: Unit, tree: Tree)(owner: Symbol): Unit = {
       try {
         tree match {
           case _: tpd.Template =>
           case _: tpd.Typed =>
           case _ =>
-            super.traverseTreeChildren(tree)(owner)
+            super.foldOverTree(x, tree)(owner)
         }
       } catch {
         case e: MatchError =>
