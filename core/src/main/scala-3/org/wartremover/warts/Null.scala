@@ -25,6 +25,9 @@ object Null extends WartTraverser {
               case _ =>
                 super.traverseTree(tree)(owner)
             }
+          case t @ ValDef(_, _, Some(Wildcard())) if t.symbol.flags.is(Flags.Mutable) && t.tpt.tpe <:< TypeRepr.of[AnyRef] =>
+            error(u)(tree.pos, "null is disabled")
+
           case _ =>
             super.traverseTree(tree)(owner)
         }
