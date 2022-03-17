@@ -87,14 +87,4 @@ class NullTest extends AnyFunSuite with ResultAssertions {
     }
     assertEmpty(result)
   }
-
-  test("Null wart obeys SuppressWarnings in classes with default arguments") {
-    val result = WartTestTraverser(Null) {
-      @SuppressWarnings(Array("org.wartremover.warts.Null"))
-      class ClassWithArgs(val foo: String = null)
-      @SuppressWarnings(Array("org.wartremover.warts.Null"))
-      case class CaseClassWithArgs(val foo: String = null)
-    }
-    assertEmpty(result)
-  }
 }
