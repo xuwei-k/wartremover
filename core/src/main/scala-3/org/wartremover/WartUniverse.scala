@@ -13,6 +13,16 @@ class WartUniverse(val quotes: Quotes, traverser: WartTraverser, onlyWarning: Bo
     protected def messagePrefix = s"[wartremover:${simpleName}] "
     final implicit val q: self.quotes.type = self.quotes
     import q.reflect.*
+
+    protected[this] final def sourceCodeContains(t: Tree, src: String): Boolean = {
+      try {
+        t.pos.sourceCode.exists(_.contains(src))
+      } catch {
+        case _: StringIndexOutOfBoundsException =>
+          false
+      }
+    }
+
     def hasWartAnnotation(t: Tree): Boolean = {
       hasWartAnnotationSymbol(t.symbol) || Option(t.symbol.maybeOwner)
         .filterNot(_.isNoSymbol)

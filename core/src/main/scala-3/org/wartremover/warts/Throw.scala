@@ -10,19 +10,8 @@ object Throw extends WartTraverser {
           case t if hasWartAnnotation(t) =>
           case t if t.isExpr =>
             t.asExpr match {
-              case '{ throw $x } =>
-                val notGeneratedCode =
-                  try {
-                    t.pos.sourceCode.exists(_.contains("throw"))
-                  } catch {
-                    case _: StringIndexOutOfBoundsException =>
-                      false
-                  }
-                if (notGeneratedCode) {
-                  error(u)(tree.pos, "throw is disabled")
-                } else {
-                  super.traverseTree(tree)(owner)
-                }
+              case '{ throw $x } if sourceCodeContains(t, "throw") =>
+                error(u)(tree.pos, "throw is disabled")
               case _ =>
                 super.traverseTree(tree)(owner)
             }
