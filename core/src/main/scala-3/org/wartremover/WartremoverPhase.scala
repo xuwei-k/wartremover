@@ -23,17 +23,22 @@ class WartremoverPhase(
 ) extends PluginPhase {
   override def phaseName = "wartremover"
 
-  override def run(using Context): Unit = {
-    report.echo("error warts = " + errorWarts.map(_.getClass.getName.dropRight(1)).mkString(", "))
-    report.echo("warning warts = " + warningWarts.map(_.getClass.getName.dropRight(1)).mkString(", "))
-    if (loadFailureWarts.nonEmpty) {
-      report.warning(s"load failure warts = " + loadFailureWarts.mkString(", "))
+  override def run(using c: Context): Unit = {
+    report.echo("run wartremover " + c.compilationUnit.source.file.toString)
+    if (false) {
+      // TODO report only once
+      report.echo("error warts = " + errorWarts.map(_.getClass.getName.dropRight(1)).mkString(", "))
+      report.echo("warning warts = " + warningWarts.map(_.getClass.getName.dropRight(1)).mkString(", "))
+      if (loadFailureWarts.nonEmpty) {
+        report.warning(s"load failure warts = " + loadFailureWarts.mkString(", "))
+      }
     }
     super.run
   }
 
   override val runsAfter = Set(TyperPhase.name)
 
+  /*
   override def prepareForIdent(tree: Ident)(using Context): Context = wartTraverse(tree)
   override def prepareForSelect(tree: Select)(using Context): Context = wartTraverse(tree)
   override def prepareForThis(tree: This)(using Context): Context = wartTraverse(tree)
@@ -68,6 +73,8 @@ class WartremoverPhase(
   override def prepareForDefDef(tree: DefDef)(using Context): Context = wartTraverse(tree)
   override def prepareForTypeDef(tree: TypeDef)(using Context): Context = wartTraverse(tree)
   override def prepareForPackageDef(tree: PackageDef)(using Context): Context = wartTraverse(tree)
+  override def prepareForOther(tree: Tree)(using Context): Context = wartTraverse(tree)
+  */
 
   // TODO
   //  override def prepareForStats(trees: List[Tree])(using Context): Context = wartTraverse(tree)
@@ -77,7 +84,6 @@ class WartremoverPhase(
   // override def prepareForTyped(tree: Typed)(using Context): Context = wartTraverse(tree)
 
   override def prepareForUnit(tree: Tree)(using Context): Context = wartTraverse(tree)
-  override def prepareForOther(tree: Tree)(using Context): Context = wartTraverse(tree)
 
   final def wartTraverse(tree: Tree)(using c: Context): c.type = {
     val c2 = QuotesCache.init(c.fresh)
