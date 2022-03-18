@@ -18,6 +18,8 @@ object Null extends WartTraverser {
               case '{ null ne ($x: AnyRef) } =>
               case '{ ($x: AnyRef) eq null } =>
               case '{ ($x: AnyRef) ne null } =>
+              case '{ new scala.xml.Elem(null, $x1, $x2, $x3, $x4) } =>
+              case '{ new scala.xml.NamespaceBinding(null, $x1, $x2) } =>
               case '{ null } =>
                 error(u)(tree.pos, "null is disabled")
               case '{ ($x: Option[t]).orNull } =>
