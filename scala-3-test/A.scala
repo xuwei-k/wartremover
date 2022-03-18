@@ -1,3 +1,5 @@
+package foo
+
 class A {
   def x1 = List(2, true) // AnyVal
 
