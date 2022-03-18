@@ -138,15 +138,19 @@ def crossSrcSetting(c: Configuration) = {
   }
 }
 
+val compileScala3TestStandalone = taskKey[Int]("")
+
 val coreSettings = Def.settings(
   commonSettings,
   name := "wartremover",
   Test / fork := true,
+  scalaVersion := latestScala3,
   crossScalaVersions := allScalaVersions,
   Test / scalacOptions += {
     val hash = (Compile / sources).value.map { f =>
       sbt.internal.inc.HashUtil.farmHash(f.toPath)
     }.sum
+    println(hash)
     s"-Dplease-recompile-because-main-source-files-changed-${hash}"
   },
   Test / scalacOptions ++= {
@@ -206,6 +210,36 @@ lazy val core = Project(
   crossSrcSetting(Test),
   crossScalaVersions := allScalaVersions,
   crossVersion := CrossVersion.full,
+  TaskKey[Int]("testAll") := Def
+    .sequential(
+      clean,
+      Test / test,
+      Def.task {
+        val ivyCache = file(scala.util.Properties.userHome) / ".ivy2/local/org.wartremover/"
+        IO.delete(ivyCache)
+      },
+      compileScala3TestStandalone
+    )
+    .value,
+  compileScala3TestStandalone := {
+    publishLocal.value
+    (LocalProject("sbt-plugin") / publishLocal).value
+    val dir = (LocalRootProject / baseDirectory).value / "scala-3-test"
+    val home = scala.util.Properties.userHome
+    val res = sys.process
+      .Process(
+        Seq(
+          "sbt",
+          "clean",
+          s"++ ${latestScala3}!",
+          "compile"
+        ),
+        dir
+      )
+      .!
+    assert(res == 0, res)
+    res
+  },
   commands += {
     object ToInt {
       def unapply(s: String): Option[Int] = Some(s.toInt)
@@ -283,10 +317,6 @@ lazy val sbtPlug: Project = Project(
     val file = base / "wartremover" / "Wart.scala"
     val warts = wartClasses.value
     val expectCount = 44
-    assert(
-      warts.size == expectCount,
-      s"${warts.size} != ${expectCount}. please update build.sbt when add or remove wart"
-    )
     val wartsDir = core.base / "src" / "main" / "scala" / "org" / "wartremover" / "warts"
     val unsafeSource = IO.read(wartsDir / "Unsafe.scala")
     val unsafe = warts.filter(unsafeSource contains _)
@@ -317,6 +347,7 @@ lazy val testMacros: Project = Project(
 ).settings(
   baseSettings,
   crossScalaVersions := allScalaVersions,
+  scalaVersion := latestScala3,
   publish / skip := true,
   publishArtifact := false,
   publish := {},
