@@ -10,7 +10,7 @@ class TraversableOpsTest extends AnyFunSuite with ResultAssertions {
     override def compare(x: Any, y: Any) = 0
   }
 
-  Seq[(String, Traversable[Any])]("List" -> List(1), "Seq" -> Seq(1), "Map" -> Map(1 -> 1)).foreach { case (name, x) =>
+  Seq[(String, Iterable[Any])]("List" -> List(1), "Seq" -> Seq(1), "Map" -> Map(1 -> 1)).foreach { case (name, x) =>
     test(s"can't use $name#head") {
       val result = WartTestTraverser(TraversableOps) {
         println(x.head)
