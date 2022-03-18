@@ -155,7 +155,20 @@ val coreSettings = Def.settings(
     (LocalProject("sbt-plugin") / publishLocal).value
     val dir = (LocalRootProject / baseDirectory).value / "scala-3-test"
     val home = scala.util.Properties.userHome
-    sys.process.Process(Seq("java", "-jar", s"${home}/.sbt/launchers/1.6.2/sbt-launch.jar", "clean", "compile"), dir).!
+    val res = sys.process
+      .Process(
+        Seq(
+          "java",
+          "-jar",
+          s"${home}/.sbt/launchers/1.6.2/sbt-launch.jar",
+          "clean",
+          "compile"
+        ),
+        dir
+      )
+      .!
+    assert(res == 0, res)
+    res
   },
   Test / scalacOptions ++= {
     if (scalaBinaryVersion.value == "3") {
