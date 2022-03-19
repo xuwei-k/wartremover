@@ -1,2 +1,2 @@
 addSbtPlugin("org.wartremover" % "sbt-wartremover" % sys.props("plugin.version"))
-addSbtPlugin("org.scoverage" % "sbt-scoverage" % "1.8.2")
+addSbtPlugin("org.scoverage" % "sbt-scoverage" % "2.0.0-M4")
