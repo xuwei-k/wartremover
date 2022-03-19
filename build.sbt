@@ -158,9 +158,7 @@ val coreSettings = Def.settings(
     val res = sys.process
       .Process(
         Seq(
-          "java",
-          "-jar",
-          s"${home}/.sbt/launchers/1.6.2/sbt-launch.jar",
+          "sbt",
           "clean",
           "compile"
         ),
