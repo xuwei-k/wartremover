@@ -22,6 +22,19 @@ class WartUniverse(val quotes: Quotes, traverser: WartTraverser, onlyWarning: Bo
           false
       }
     }
+
+    def getSyntheticPartialFunction(tree: Tree): Option[ClassDef] = {
+      PartialFunction.condOpt(tree) {
+        case c: ClassDef
+            if c.symbol.flags.is(Flags.Synthetic) && c.parents.collect { case t: TypeTree =>
+              t.tpe
+            }.exists(
+              _ <:< TypeRepr.of[PartialFunction[Nothing, Any]]
+            ) =>
+          c
+      }
+
+    }
     def isPrimitive(t: TypeRepr): Boolean = {
       t <:< TypeRepr.of[Boolean] ||
       t <:< TypeRepr.of[Byte] ||
