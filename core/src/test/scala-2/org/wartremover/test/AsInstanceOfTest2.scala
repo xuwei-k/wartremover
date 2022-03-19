@@ -9,7 +9,7 @@ class AsInstanceOfTest2 extends AnyFunSuite with ResultAssertions {
     val result = WartTestTraverser(AsInstanceOf) {
       import scala.reflect.runtime.universe.TypeTag
 
-      def takesTypeTag[A : TypeTag](a: A): String = {
+      def takesTypeTag[A: TypeTag](a: A): String = {
         val tt = implicitly[TypeTag[A]]
         s"The tt of A is $tt"
       }
@@ -27,7 +27,7 @@ class AsInstanceOfTest2 extends AnyFunSuite with ResultAssertions {
         case (message: String)PrintLn(_) =>
           new Task[Unit](()).asInstanceOf[Task[A]]
       }
-    */
+     */
 
     val result = WartTestTraverser(AsInstanceOf) {
       class Task[A](value: A)
