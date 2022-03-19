@@ -22,6 +22,16 @@ class WartUniverse(val quotes: Quotes, traverser: WartTraverser, onlyWarning: Bo
           false
       }
     }
+    def isPrimitive(t: TypeRepr): Boolean = {
+      t <:< TypeRepr.of[Boolean] ||
+      t <:< TypeRepr.of[Byte] ||
+      t <:< TypeRepr.of[Short] ||
+      t <:< TypeRepr.of[Char] ||
+      t <:< TypeRepr.of[Int] ||
+      t <:< TypeRepr.of[Long] ||
+      t <:< TypeRepr.of[Float] ||
+      t <:< TypeRepr.of[Double]
+    }
 
     def hasWartAnnotation(t: Tree): Boolean = {
       hasWartAnnotationSymbol(t.symbol) || Option(t.symbol.maybeOwner)
