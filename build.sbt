@@ -144,6 +144,7 @@ val coreSettings = Def.settings(
   commonSettings,
   name := "wartremover",
   Test / fork := true,
+  crossScalaVersions := allScalaVersions,
   Test / scalacOptions += {
     val hash = (Compile / sources).value.map { f =>
       sbt.internal.inc.HashUtil.farmHash(f.toPath)
@@ -151,7 +152,6 @@ val coreSettings = Def.settings(
     println(hash)
     s"-Dplease-recompile-because-main-source-files-changed-${hash}"
   },
-  crossScalaVersions := allScalaVersions,
   TaskKey[Int]("testAll") := Def.sequential(clean, (Test / test), compileScala3TestStandalone).value,
   compileScala3TestStandalone := {
     publishLocal.value

@@ -1,5 +1,6 @@
 package org.wartremover.test
 
+import org.wartremover.LogLevel
 import org.wartremover.WartTraverser
 import org.wartremover.WartUniverse
 import dotty.tools.dotc.ast.tpd
@@ -59,7 +60,7 @@ object WartTestTraverser {
       val clazz = Class.forName(t.show + NameTransformer.MODULE_SUFFIX_STRING)
       clazz.getField(NameTransformer.MODULE_INSTANCE_NAME).get(null).asInstanceOf[WartTraverser]
     }
-    val universe = new WartUniverse(q1, wart, onlyWarning = false)
+    val universe = new WartUniverse(q1, wart, onlyWarning = false, logLevel = LogLevel.Info)
     val x: universe.Traverser = wart.apply(universe)
     val term = x.q.reflect.asTerm(expr)
     x.traverseTree(term)(term.symbol)

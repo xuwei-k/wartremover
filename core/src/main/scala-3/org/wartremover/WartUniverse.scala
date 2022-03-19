@@ -5,7 +5,7 @@ import scala.quoted.Quotes
 import scala.quoted.Type
 import java.lang.SuppressWarnings
 
-class WartUniverse(val quotes: Quotes, traverser: WartTraverser, onlyWarning: Boolean) { self =>
+class WartUniverse(val quotes: Quotes, traverser: WartTraverser, onlyWarning: Boolean, logLevel: LogLevel) { self =>
   abstract class Traverser extends quotes.reflect.TreeTraverser {
     private[this] def simpleName: String = traverser.getClass.getSimpleName.dropRight(1)
     private[this] def fullName: String = traverser.getClass.getName.dropRight(1)
@@ -33,8 +33,8 @@ class WartUniverse(val quotes: Quotes, traverser: WartTraverser, onlyWarning: Bo
             ) =>
           c
       }
-
     }
+
     def isPrimitive(t: TypeRepr): Boolean = {
       t <:< TypeRepr.of[Boolean] ||
       t <:< TypeRepr.of[Byte] ||
@@ -85,7 +85,9 @@ class WartUniverse(val quotes: Quotes, traverser: WartTraverser, onlyWarning: Bo
         }
       } catch {
         case e: MatchError =>
-          warning(self)(tree.pos, s"MatchError ${tree.getClass} ${owner.getClass}")
+          if (logLevel != LogLevel.Disable) {
+            warning(self)(tree.pos, s"MatchError ${tree.getClass} ${owner.getClass}")
+          }
       }
     }
     // TODO remove Universe param?
