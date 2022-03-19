@@ -55,7 +55,7 @@ object WartTestTraverser {
     val q2 = q1.asInstanceOf[QuotesImpl]
     val reporter = new WartReporter
     q2.ctx.asInstanceOf[FreshContext].setReporter(reporter)
-    val wart = Type.valueOfConstant[A].getOrElse {
+    val wart = {
       val clazz = Class.forName(t.show + NameTransformer.MODULE_SUFFIX_STRING)
       clazz.getField(NameTransformer.MODULE_INSTANCE_NAME).get(null).asInstanceOf[WartTraverser]
     }

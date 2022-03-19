@@ -2,11 +2,16 @@ package org.wartremover
 
 import dotty.tools.dotc.plugins.PluginPhase
 import dotty.tools.dotc.plugins.StandardPlugin
+import java.util.concurrent.atomic.AtomicBoolean
 import scala.reflect.NameTransformer
 
-enum LogLevel(val velue: String) {
+enum LogLevel(val value: String) {
   case Disable extends LogLevel("disable")
   case Info extends LogLevel("info")
+  case Debug extends LogLevel("debug")
+}
+object LogLevel {
+  val map: Map[String, LogLevel] = this.values.map(x => x.value -> x).toMap
 }
 
 class Plugin extends StandardPlugin {
@@ -26,6 +31,8 @@ class Plugin extends StandardPlugin {
     }
   }
 
+  private[this] val initialLog = new AtomicBoolean(true)
+
   override def init(options: List[String]): List[PluginPhase] = {
     val excluded = options.collect { case s"excluded:${path}" =>
       path
@@ -36,11 +43,16 @@ class Plugin extends StandardPlugin {
     val (errors2, warningWarts) = options.collect { case s"only-warn-traverser:${name}" =>
       loadWart(name)
     }.partitionMap(identity)
+    val loglevel: LogLevel = options.collect { case s"loglevel:${level}" =>
+      LogLevel.map.get(level)
+    }.flatten.headOption.getOrElse(LogLevel.Disable)
     val newPhase = new WartremoverPhase(
       errorWarts = errorWarts,
       warningWarts = warningWarts,
       loadFailureWarts = errors1 ++ errors2,
-      excluded = excluded
+      excluded = excluded,
+      logLevel = loglevel,
+      initialLog = initialLog,
     )
     newPhase :: Nil
   }
