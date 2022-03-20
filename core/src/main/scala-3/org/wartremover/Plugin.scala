@@ -2,6 +2,7 @@ package org.wartremover
 
 import dotty.tools.dotc.plugins.PluginPhase
 import dotty.tools.dotc.plugins.StandardPlugin
+import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.reflect.NameTransformer
 
@@ -26,7 +27,7 @@ class Plugin extends StandardPlugin {
 
   override def init(options: List[String]): List[PluginPhase] = {
     val excluded = options.collect { case s"excluded:${path}" =>
-      path
+      new File(path).getAbsolutePath
     }
     val (errors1, errorWarts) = options.collect { case s"traverser:${name}" =>
       loadWart(name)

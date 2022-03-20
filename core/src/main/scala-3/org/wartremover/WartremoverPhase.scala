@@ -40,22 +40,30 @@ class WartremoverPhase(
           if (loadFailureWarts.nonEmpty) {
             report.warning(s"load failure warts = " + loadFailureWarts.mkString(", "))
           }
+          if (excluded.nonEmpty) {
+            report.echo("excluded = " + excluded.mkString(", "))
+          }
         }
       case LogLevel.Disable =>
     }
+    val skip = excluded.exists(c.source.file.absolute.path.startsWith)
     logLevel match {
       case LogLevel.Info | LogLevel.Disable =>
       case LogLevel.Debug =>
-        report.echo("run wartremover " + c.compilationUnit.source.file.toString)
+        if (skip) {
+          report.echo("skip wartremover " + c.compilationUnit.source.file.toString)
+        } else {
+          report.echo("run wartremover " + c.compilationUnit.source.file.toString)
+        }
     }
-    super.run
+    if (!skip) {
+      super.run
+    }
   }
 
   override val runsAfter = Set(TyperPhase.name)
 
-  override def prepareForUnit(tree: Tree)(using Context): Context = wartTraverse(tree)
-
-  final def wartTraverse(tree: Tree)(using c: Context): c.type = {
+  override def prepareForUnit(tree: Tree)(using c: Context): Context = {
     val c2 = QuotesCache.init(c.fresh)
     val q = scala.quoted.runtime.impl.QuotesImpl()(using c2)
     def runWart(w: WartTraverser, onlyWarning: Boolean): Unit = {
