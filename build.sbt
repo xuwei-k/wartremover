@@ -144,6 +144,7 @@ val coreSettings = Def.settings(
   commonSettings,
   name := "wartremover",
   Test / fork := true,
+  scalaVersion := latestScala3,
   crossScalaVersions := allScalaVersions,
   Test / scalacOptions += {
     val hash = (Compile / sources).value.map { f =>
@@ -331,6 +332,7 @@ lazy val testMacros: Project = Project(
 ).settings(
   baseSettings,
   crossScalaVersions := allScalaVersions,
+  scalaVersion := latestScala3,
   publish / skip := true,
   publishArtifact := false,
   publish := {},
