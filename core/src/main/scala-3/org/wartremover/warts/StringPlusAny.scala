@@ -1,6 +1,7 @@
 package org.wartremover
 package warts
 
+import scala.annotation.nowarn
 import scala.quoted.Expr
 
 object StringPlusAny extends WartTraverser {
@@ -19,6 +20,8 @@ object StringPlusAny extends WartTraverser {
           case _ => false
         }
       }
+
+      @nowarn("msg=any2stringadd")
       override def traverseTree(tree: Tree)(owner: Symbol): Unit = {
         tree match {
           case t if hasWartAnnotation(t) =>

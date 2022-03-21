@@ -1,6 +1,7 @@
 package org.wartremover
 
 import dotty.tools.dotc.ast.tpd
+import scala.annotation.nowarn
 import scala.quoted.Quotes
 import scala.quoted.Type
 import java.lang.SuppressWarnings
@@ -75,6 +76,7 @@ class WartUniverse(val quotes: Quotes, traverser: WartTraverser, onlyWarning: Bo
 
       args.contains(fullName) || args("org.wartremover.warts.All")
     }
+    @nowarn("msg=dotty.tools.dotc.ast.tpd")
     override def foldOverTree(x: Unit, tree: Tree)(owner: Symbol): Unit = {
       try {
         tree match {

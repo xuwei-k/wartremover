@@ -2,7 +2,11 @@ package org.wartremover
 package warts
 
 import org.wartremover.WartTraverser
+import scala.annotation.nowarn
 
+@nowarn("msg=right-biased")
+@nowarn("msg=Either.toOption.get")
+@nowarn("msg=Either.swap.getOrElse")
 object EitherProjectionPartial extends WartTraverser {
   def apply(u: WartUniverse): u.Traverser = {
     new u.Traverser {

@@ -2,7 +2,9 @@ package org.wartremover
 package warts
 
 import org.wartremover.WartTraverser
+import scala.annotation.nowarn
 
+@nowarn("msg=LazyList")
 object RedundantConversions extends WartTraverser {
   def apply(u: WartUniverse): u.Traverser = {
     new u.Traverser {
