@@ -13,6 +13,7 @@ object ImplicitConversion extends WartTraverser {
                 !t.symbol.flags.is(Flags.Protected) &&
                 !t.symbol.flags.is(Flags.Private) &&
                 !t.symbol.flags.is(Flags.Synthetic) &&
+                !sourceCodeContains(t, "implicit class ") &&
                 t.paramss.collect { case c: TermParamClause => c }.exists(!_.isImplicit) =>
             error(u)(tree.pos, "Implicit conversion is disabled")
             super.traverseTree(tree)(owner)
