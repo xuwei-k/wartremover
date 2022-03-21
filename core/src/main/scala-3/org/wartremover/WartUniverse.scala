@@ -6,7 +6,7 @@ import scala.quoted.Quotes
 import scala.quoted.Type
 import java.lang.SuppressWarnings
 
-class WartUniverse(implicit val quotes: Quotes, onlyWarning: Boolean, logLevel: LogLevel) { self =>
+class WartUniverse(onlyWarning: Boolean, logLevel: LogLevel, val quotes: Quotes) { self =>
   abstract class Traverser extends quotes.reflect.TreeTraverser {
     final implicit val q: self.quotes.type = self.quotes
     import q.reflect.*

@@ -11,7 +11,7 @@ abstract class ForbidType[A <: AnyKind](message: String)(using getType: Quotes ?
       private[this] val A: TypeRepr = TypeRepr.of[A]
       override def traverseTree(tree: Tree)(owner: Symbol): Unit = {
         tree match {
-          case t if hasWartAnnotation(t) =>
+          case t if hasWartAnnotation(u)(t) =>
           case a: TypeTree if a.tpe =:= A =>
             error(u)(tree.pos, message)
           case _ =>

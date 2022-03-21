@@ -10,7 +10,7 @@ object ListAppend extends WartTraverser {
       import q.reflect.*
       override def traverseTree(tree: Tree)(owner: Symbol): Unit = {
         tree match {
-          case t if hasWartAnnotation(t) =>
+          case t if hasWartAnnotation(u)(t) =>
           case t if t.isExpr =>
             t.asExpr match {
               case '{ ($list: List[tpe1]) :+ ($value: tpe2) } =>

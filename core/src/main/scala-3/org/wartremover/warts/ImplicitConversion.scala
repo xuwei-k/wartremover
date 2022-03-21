@@ -7,7 +7,7 @@ object ImplicitConversion extends WartTraverser {
       import q.reflect.*
       override def traverseTree(tree: Tree)(owner: Symbol): Unit = {
         tree match {
-          case t if hasWartAnnotation(t) =>
+          case t if hasWartAnnotation(u)(t) =>
           case t: DefDef
               if t.symbol.flags.is(Flags.Implicit) &&
                 !t.symbol.flags.is(Flags.Protected) &&

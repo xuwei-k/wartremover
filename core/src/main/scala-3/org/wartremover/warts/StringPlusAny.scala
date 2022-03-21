@@ -24,7 +24,7 @@ object StringPlusAny extends WartTraverser {
       @nowarn("msg=any2stringadd")
       override def traverseTree(tree: Tree)(owner: Symbol): Unit = {
         tree match {
-          case t if hasWartAnnotation(t) =>
+          case t if hasWartAnnotation(u)(t) =>
           case Apply(Select(lhs, "+"), List(rhs))
               if lhs.tpe <:< TypeRepr.of[String] && !(rhs.tpe <:< TypeRepr.of[String]) =>
             error(u)(tree.pos, "Implicit conversion to string is disabled")

@@ -9,7 +9,7 @@ object ArrayEquals extends WartTraverser {
       import q.reflect.*
       override def traverseTree(tree: Tree)(owner: Symbol): Unit = {
         tree match {
-          case t if hasWartAnnotation(t) =>
+          case t if hasWartAnnotation(u)(t) =>
           case t if t.isExpr =>
             t.asExpr match {
               case '{ ($x1: Array[t]) == null } =>

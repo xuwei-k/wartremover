@@ -7,7 +7,7 @@ object MutableDataStructures extends WartTraverser {
       import q.reflect.*
       override def traverseTree(tree: Tree)(owner: Symbol): Unit = {
         tree match {
-          case t if hasWartAnnotation(t) =>
+          case t if hasWartAnnotation(u)(t) =>
           case t: TypeTree if t.tpe.classSymbol.exists(_.fullName.startsWith("scala.collection.mutable.")) =>
             error(u)(tree.pos, "scala.collection.mutable package is disabled")
             super.traverseTree(tree)(owner)

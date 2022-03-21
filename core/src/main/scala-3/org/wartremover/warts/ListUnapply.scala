@@ -21,7 +21,7 @@ object ListUnapply extends WartTraverser {
 
       override def traverseTree(tree: Tree)(owner: Symbol): Unit = {
         tree match {
-          case t if hasWartAnnotation(t) =>
+          case t if hasWartAnnotation(u)(t) =>
           case m: Match =>
             // TODO more better compare?
             if (m.scrutinee.tpe.classSymbol == TypeRepr.of[List[?]].classSymbol) {

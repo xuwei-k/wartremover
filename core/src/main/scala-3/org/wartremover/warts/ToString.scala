@@ -8,7 +8,7 @@ object ToString extends WartTraverser {
 
       override def traverseTree(tree: Tree)(owner: Symbol): Unit = {
         tree match {
-          case t if hasWartAnnotation(t) =>
+          case t if hasWartAnnotation(u)(t) =>
           case Apply(Select(lhs, "toString"), Nil) if !isPrimitive(lhs.tpe) && !(lhs.tpe <:< TypeRepr.of[String]) =>
             val x = lhs.symbol.declaredMethod("toString")
             val parent = lhs.tpe.baseClasses.head

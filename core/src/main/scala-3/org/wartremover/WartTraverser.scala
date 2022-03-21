@@ -18,7 +18,7 @@ abstract class WartTraverser { self =>
   }
 
   private[this] def hasWartAnnotationSymbol(u: WartUniverse)(s: u.quotes.reflect.Symbol): Boolean = {
-    import u.quotes
+    implicit val q = u.quotes
     import u.quotes.reflect.*
     val SuppressWarningsSymbol = TypeTree.of[java.lang.SuppressWarnings].symbol
 

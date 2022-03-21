@@ -10,7 +10,7 @@ object TraversableOps extends WartTraverser {
           error(u)(tree.pos, s"${method} is disabled - use ${alternative} instead")
 
         tree match {
-          case t if hasWartAnnotation(t) =>
+          case t if hasWartAnnotation(u)(t) =>
           case t if t.isExpr =>
             t.asExpr match {
               case '{ ($x: collection.Iterable[t]).head } =>

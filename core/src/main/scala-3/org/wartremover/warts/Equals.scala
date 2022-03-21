@@ -8,7 +8,7 @@ object Equals extends WartTraverser {
       val methods = Seq("==", "!=", "equals", "eq", "ne")
       override def traverseTree(tree: Tree)(owner: Symbol): Unit = {
         tree match {
-          case t if hasWartAnnotation(t) =>
+          case t if hasWartAnnotation(u)(t) =>
           case t if t.isExpr => // && methods.exists(m => sourceCodeContains(t, m)) =>
             t.asExpr match {
               case '{ ($x1: Any) == ($x2: Any) } =>
