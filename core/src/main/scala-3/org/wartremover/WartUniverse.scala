@@ -16,11 +16,12 @@ class WartUniverse(val quotes: Quotes, traverser: WartTraverser, onlyWarning: Bo
     import q.reflect.*
 
     protected[this] final def sourceCodeContains(t: Tree, src: String): Boolean = {
-      try {
-        t.pos.sourceCode.exists(_.contains(src))
-      } catch {
-        case _: StringIndexOutOfBoundsException =>
-          false
+      // avoid StringIndexOutOfBoundsException
+      // Don't use `def sourceCode: Option[String]`
+      // https://github.com/lampepfl/dotty/blob/58b59a5f88508bb4b3/compiler/src/scala/quoted/runtime/impl/QuotesImpl.scala#L2791-L2793
+      t.pos.sourceFile.content.exists { content =>
+        val sliced = content.slice(t.pos.start, t.pos.end)
+        sliced.contains(src)
       }
     }
 

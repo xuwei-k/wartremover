@@ -26,6 +26,8 @@ class A {
   // ArrayEquals
   def x3 = Array(1) == Array(2)
 
+  // assert is macro in Scala 3
+  assert("x".isInstanceOf[Long])
 
   // ListUnapply, DefaultArguments
   def x4[B](a: collection.Seq[B] = Nil): Int = a match {
