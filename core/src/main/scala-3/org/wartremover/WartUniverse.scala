@@ -93,16 +93,14 @@ class WartUniverse(val quotes: Quotes, traverser: WartTraverser, onlyWarning: Bo
           }
       }
     }
-    // TODO remove Universe param?
-    protected final def warning(u: WartUniverse)(pos: Position, message: String): Unit = {
-      report.warning(messagePrefix + message, pos)
+    protected final def warning(u: WartUniverse)(pos: u.quotes.reflect.Position, message: String): Unit = {
+      u.quotes.reflect.report.warning(messagePrefix + message, pos)
     }
-    // TODO remove Universe param?
-    protected final def error(u: WartUniverse)(pos: Position, message: String): Unit = {
+    protected final def error(u: WartUniverse)(pos: u.quotes.reflect.Position, message: String): Unit = {
       if (onlyWarning) {
-        report.warning(messagePrefix + message, pos)
+        u.quotes.reflect.report.warning(messagePrefix + message, pos)
       } else {
-        report.error(messagePrefix + message, pos)
+        u.quotes.reflect.report.error(messagePrefix + message, pos)
       }
     }
   }
