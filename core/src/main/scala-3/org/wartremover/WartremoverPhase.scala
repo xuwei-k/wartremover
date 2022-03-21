@@ -1,7 +1,6 @@
 package org.wartremover
 
 import dotty.tools.dotc.ast.tpd
-import dotty.tools.dotc.ast.tpd.*
 import dotty.tools.dotc.core.Contexts.Context
 import dotty.tools.dotc.core.Contexts.ctx
 import dotty.tools.dotc.core.Symbols.defn
@@ -63,7 +62,7 @@ class WartremoverPhase(
 
   override val runsAfter = Set(TyperPhase.name)
 
-  override def prepareForUnit(tree: Tree)(using c: Context): Context = {
+  override def prepareForUnit(tree: tpd.Tree)(using c: Context): Context = {
     val c2 = QuotesCache.init(c.fresh)
     val q = scala.quoted.runtime.impl.QuotesImpl()(using c2)
     def runWart(w: WartTraverser, onlyWarning: Boolean): Unit = {
