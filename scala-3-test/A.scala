@@ -1,5 +1,13 @@
 package foo
 
+case class B[X](a: X)
+
+object C {
+  trait T[R]
+  type T1 = String
+  object T1 extends T[Unit]
+}
+
 class A {
   def x1 = List(2, true) // AnyVal
 
