@@ -28,4 +28,10 @@ class IsInstanceOfTest extends AnyFunSuite with ResultAssertions {
     }
     assertEmpty(result)
   }
+  test("isInstanceOf should not check macro expansions") {
+    val result = WartTestTraverser(IsInstanceOf) {
+      IsInstanceOfTestMacros.is[Object, String]
+    }
+    assertEmpty(result)
+  }
 }
