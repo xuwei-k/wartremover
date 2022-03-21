@@ -3,15 +3,15 @@ package warts
 
 object ThreadSleep extends WartTraverser {
   def apply(u: WartUniverse): u.Traverser = {
-    new u.Traverser {
+    new u.Traverser(this) {
       import q.reflect.*
       override def traverseTree(tree: Tree)(owner: Symbol): Unit = {
         tree match {
-          case t if hasWartAnnotation(u)(t) =>
+          case t if hasWartAnnotation(t) =>
           case t if t.isExpr =>
             t.asExpr match {
               case '{ Thread.sleep($x) } =>
-                error(u)(tree.pos, "don't use Thread.sleep")
+                error(tree.pos, "don't use Thread.sleep")
               case _ =>
                 super.traverseTree(tree)(owner)
             }

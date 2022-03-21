@@ -6,7 +6,7 @@ import scala.quoted.Expr
 
 object StringPlusAny extends WartTraverser {
   def apply(u: WartUniverse): u.Traverser = {
-    new u.Traverser {
+    new u.Traverser(this) {
       import q.reflect.*
       object PrimitivePlusString {
         def unapply[A](t: Expr[A]): Boolean = t match {
@@ -24,16 +24,16 @@ object StringPlusAny extends WartTraverser {
       @nowarn("msg=any2stringadd")
       override def traverseTree(tree: Tree)(owner: Symbol): Unit = {
         tree match {
-          case t if hasWartAnnotation(u)(t) =>
+          case t if hasWartAnnotation(t) =>
           case Apply(Select(lhs, "+"), List(rhs))
               if lhs.tpe <:< TypeRepr.of[String] && !(rhs.tpe <:< TypeRepr.of[String]) =>
-            error(u)(tree.pos, "Implicit conversion to string is disabled")
+            error(tree.pos, "Implicit conversion to string is disabled")
           case t if t.isExpr =>
             t.asExpr match {
               case '{ new Predef.any2stringadd($x) } =>
-                error(u)(tree.pos, "Implicit conversion to string is disabled")
+                error(tree.pos, "Implicit conversion to string is disabled")
               case PrimitivePlusString() =>
-                error(u)(tree.pos, "Implicit conversion to string is disabled")
+                error(tree.pos, "Implicit conversion to string is disabled")
               case '{ ($x1: String) + ($x2: String) } =>
               case _ =>
                 super.traverseTree(tree)(owner)

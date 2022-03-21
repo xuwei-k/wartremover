@@ -3,11 +3,11 @@ package warts
 
 object Overloading extends WartTraverser {
   def apply(u: WartUniverse): u.Traverser = {
-    new u.Traverser {
+    new u.Traverser(this) {
       import q.reflect.*
       override def traverseTree(tree: Tree)(owner: Symbol): Unit = {
         tree match {
-          case t if hasWartAnnotation(u)(t) =>
+          case t if hasWartAnnotation(t) =>
           case t: ClassDef =>
             // TODO
             val parentMethodNames: Set[String] = (
@@ -18,11 +18,11 @@ object Overloading extends WartTraverser {
             val methods = t.body.collect { case d: DefDef => d }
             val overloads = methods
               .groupBy(_.name)
-              .map(_._2.filterNot(t => hasWartAnnotation(u)(t)).filterNot(_.symbol.flags.is(Flags.Override)))
+              .map(_._2.filterNot(t => hasWartAnnotation(t)).filterNot(_.symbol.flags.is(Flags.Override)))
               .filter(f => (f.sizeIs > 1))
 
             overloads.flatten.foreach { method =>
-              error(u)(method.pos, "Overloading is disabled")
+              error(method.pos, "Overloading is disabled")
             }
             super.traverseTree(tree)(owner)
           case _ =>

@@ -7,9 +7,47 @@ import scala.quoted.Type
 import java.lang.SuppressWarnings
 
 class WartUniverse(onlyWarning: Boolean, logLevel: LogLevel, val quotes: Quotes) { self =>
-  abstract class Traverser extends quotes.reflect.TreeTraverser {
+  abstract class Traverser(traverser: WartTraverser) extends quotes.reflect.TreeTraverser {
     final implicit val q: self.quotes.type = self.quotes
     import q.reflect.*
+
+    protected final def warning(pos: quotes.reflect.Position, message: String): Unit =
+      self.warning(pos = pos, message = message, wartName = traverser.simpleName)
+
+    protected final def error(pos: quotes.reflect.Position, message: String): Unit =
+      self.error(pos = pos, message = message, wartName = traverser.simpleName)
+
+    def hasWartAnnotation(t: quotes.reflect.Tree): Boolean = {
+      hasWartAnnotationSymbol(t.symbol) || Option(t.symbol.maybeOwner)
+        .filterNot(_.isNoSymbol)
+        .filter(s => s.isClassDef || s.isValDef || s.isDefDef)
+        .exists(hasWartAnnotationSymbol)
+    }
+
+    private[this] def hasWartAnnotationSymbol(s: quotes.reflect.Symbol): Boolean = {
+      val SuppressWarningsSymbol = TypeTree.of[java.lang.SuppressWarnings].symbol
+
+      val args: Set[String] = s
+        .getAnnotation(SuppressWarningsSymbol)
+        .collect {
+          case a1 if a1.isExpr =>
+            PartialFunction
+              .condOpt(a1.asExpr) { case '{ new java.lang.SuppressWarnings($a2: Array[String]) } =>
+                PartialFunction
+                  .condOpt(a2.asTerm) { case Apply(Apply(_, Typed(e, _) :: Nil), _) =>
+                    e.asExprOf[Seq[String]].value
+                  }
+                  .flatten
+              }
+              .flatten
+        }
+        .flatten
+        .toList
+        .flatten
+        .toSet
+
+      args.contains(traverser.fullName) || args("org.wartremover.warts.All")
+    }
 
     protected[this] final def sourceCodeContains(t: Tree, src: String): Boolean = {
       // avoid StringIndexOutOfBoundsException
@@ -56,7 +94,7 @@ class WartUniverse(onlyWarning: Boolean, logLevel: LogLevel, val quotes: Quotes)
       } catch {
         case e: MatchError =>
           if (logLevel != LogLevel.Disable) {
-            warning(tree.pos, s"MatchError ${tree.getClass} ${owner.getClass}", "")
+            warning(tree.pos, s"MatchError ${tree.getClass} ${owner.getClass}")
           }
       }
     }

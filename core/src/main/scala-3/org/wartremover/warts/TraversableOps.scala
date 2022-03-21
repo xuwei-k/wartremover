@@ -3,14 +3,14 @@ package warts
 
 object TraversableOps extends WartTraverser {
   def apply(u: WartUniverse): u.Traverser = {
-    new u.Traverser {
+    new u.Traverser(this) {
       import q.reflect.*
       override def traverseTree(tree: Tree)(owner: Symbol): Unit = {
         def err(method: String, alternative: String) =
-          error(u)(tree.pos, s"${method} is disabled - use ${alternative} instead")
+          error(tree.pos, s"${method} is disabled - use ${alternative} instead")
 
         tree match {
-          case t if hasWartAnnotation(u)(t) =>
+          case t if hasWartAnnotation(t) =>
           case t if t.isExpr =>
             t.asExpr match {
               case '{ ($x: collection.Iterable[t]).head } =>

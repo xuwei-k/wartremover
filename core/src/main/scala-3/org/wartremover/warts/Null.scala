@@ -13,11 +13,11 @@ object Null extends WartTraverser {
   }
 
   def apply(u: WartUniverse): u.Traverser = {
-    new u.Traverser {
+    new u.Traverser(this) {
       import q.reflect.*
       override def traverseTree(tree: Tree)(owner: Symbol): Unit = {
         tree match {
-          case t if hasWartAnnotation(u)(t) =>
+          case t if hasWartAnnotation(t) =>
           case t if t.isExpr =>
             val e = t.asExpr
             e match {
@@ -30,7 +30,7 @@ object Null extends WartTraverser {
               case '{ ($x: AnyRef) eq null } =>
               case '{ ($x: AnyRef) ne null } =>
               case '{ ($x: Option[t]).orNull } =>
-                error(u)(tree.pos, "Option#orNull is disabled")
+                error(tree.pos, "Option#orNull is disabled")
               case _ =>
                 val continue = if (existsScalaXML) {
                   e match {
@@ -48,7 +48,7 @@ object Null extends WartTraverser {
                 if (continue) {
                   e match {
                     case '{ null } =>
-                      error(u)(tree.pos, "null is disabled")
+                      error(tree.pos, "null is disabled")
                     case _ =>
                       super.traverseTree(tree)(owner)
                   }
@@ -56,7 +56,7 @@ object Null extends WartTraverser {
             }
           case t @ ValDef(_, _, Some(Wildcard()))
               if t.symbol.flags.is(Flags.Mutable) && t.tpt.tpe <:< TypeRepr.of[AnyRef] =>
-            error(u)(tree.pos, "null is disabled")
+            error(tree.pos, "null is disabled")
 
           case _ =>
             super.traverseTree(tree)(owner)

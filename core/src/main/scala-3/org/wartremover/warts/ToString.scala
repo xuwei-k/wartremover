@@ -3,12 +3,12 @@ package warts
 
 object ToString extends WartTraverser {
   def apply(u: WartUniverse): u.Traverser = {
-    new u.Traverser {
+    new u.Traverser(this) {
       import q.reflect.*
 
       override def traverseTree(tree: Tree)(owner: Symbol): Unit = {
         tree match {
-          case t if hasWartAnnotation(u)(t) =>
+          case t if hasWartAnnotation(t) =>
           case Apply(Select(lhs, "toString"), Nil) if !isPrimitive(lhs.tpe) && !(lhs.tpe <:< TypeRepr.of[String]) =>
             val x = lhs.symbol.declaredMethod("toString")
             val parent = lhs.tpe.baseClasses.head
@@ -17,7 +17,7 @@ object ToString extends WartTraverser {
             } else {
               "class " + parent.name
             }
-            error(u)(tree.pos, s"${name} does not override toString and automatic toString is disabled")
+            error(tree.pos, s"${name} does not override toString and automatic toString is disabled")
           case _ =>
             super.traverseTree(tree)(owner)
         }

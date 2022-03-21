@@ -16,21 +16,21 @@ object PlatformDefault extends WartTraverser {
     "don't use scala.io.Codec.fallbackSystemCodec. don't use platform's default charset"
 
   def apply(u: WartUniverse): u.Traverser = {
-    new u.Traverser {
+    new u.Traverser(this) {
       import q.reflect.*
       override def traverseTree(tree: Tree)(owner: Symbol): Unit = {
         tree match {
-          case t if hasWartAnnotation(u)(t) =>
+          case t if hasWartAnnotation(t) =>
           case t if t.isExpr =>
             t.asExpr match {
               case '{ ($x: String).getBytes } =>
-                error(u)(tree.pos, getByte)
+                error(tree.pos, getByte)
               case '{ ($x1: String).toLowerCase } | '{ ($x2: String).toUpperCase } =>
-                error(u)(tree.pos, upperLowerCase)
+                error(tree.pos, upperLowerCase)
               case '{ new String(($x: Array[Byte])) } =>
-                error(u)(tree.pos, newString)
+                error(tree.pos, newString)
               case '{ scala.io.Codec.fallbackSystemCodec } =>
-                error(u)(tree.pos, fallbackSystemCodec)
+                error(tree.pos, fallbackSystemCodec)
               case _ =>
                 super.traverseTree(tree)(owner)
             }
