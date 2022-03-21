@@ -153,7 +153,17 @@ val coreSettings = Def.settings(
     println(hash)
     s"-Dplease-recompile-because-main-source-files-changed-${hash}"
   },
-  TaskKey[Int]("testAll") := Def.sequential(clean, (Test / test), compileScala3TestStandalone).value,
+  TaskKey[Int]("testAll") := Def
+    .sequential(
+      clean,
+      Test / test,
+      Def.task {
+        val ivyCache = file(scala.util.Properties.userHome) / ".ivy2/local/org.wartremover/"
+        IO.delete(ivyCache)
+      },
+      compileScala3TestStandalone
+    )
+    .value,
   compileScala3TestStandalone := {
     publishLocal.value
     (LocalProject("sbt-plugin") / publishLocal).value
@@ -164,6 +174,7 @@ val coreSettings = Def.settings(
         Seq(
           "sbt",
           "clean",
+          s"++ ${latestScala3}!",
           "compile"
         ),
         dir
