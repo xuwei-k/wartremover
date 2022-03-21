@@ -6,7 +6,7 @@ import scala.quoted.Quotes
 import scala.quoted.Type
 import java.lang.SuppressWarnings
 
-class WartUniverse(val quotes: Quotes, traverser: WartTraverser, onlyWarning: Boolean, logLevel: LogLevel) { self =>
+class WartUniverse(implicit val quotes: Quotes, onlyWarning: Boolean, logLevel: LogLevel) { self =>
   abstract class Traverser extends quotes.reflect.TreeTraverser {
     final implicit val q: self.quotes.type = self.quotes
     import q.reflect.*
@@ -44,35 +44,6 @@ class WartUniverse(val quotes: Quotes, traverser: WartTraverser, onlyWarning: Bo
       t <:< TypeRepr.of[Double]
     }
 
-    def hasWartAnnotation(t: Tree): Boolean = {
-      hasWartAnnotationSymbol(t.symbol) || Option(t.symbol.maybeOwner)
-        .filterNot(_.isNoSymbol)
-        .filter(s => s.isClassDef || s.isValDef || s.isDefDef)
-        .exists(hasWartAnnotationSymbol)
-    }
-    private[this] val SuppressWarningsSymbol = TypeTree.of[SuppressWarnings].symbol
-    private[this] def hasWartAnnotationSymbol(s: Symbol): Boolean = {
-      val args: Set[String] = s
-        .getAnnotation(SuppressWarningsSymbol)
-        .collect {
-          case a1 if a1.isExpr =>
-            PartialFunction
-              .condOpt(a1.asExpr) { case '{ new SuppressWarnings($a2: Array[String]) } =>
-                PartialFunction
-                  .condOpt(a2.asTerm) { case Apply(Apply(_, Typed(e, _) :: Nil), _) =>
-                    e.asExprOf[Seq[String]].value
-                  }
-                  .flatten
-              }
-              .flatten
-        }
-        .flatten
-        .toList
-        .flatten
-        .toSet
-
-      args.contains(traverser.fullName) || args("org.wartremover.warts.All")
-    }
     @nowarn("msg=dotty.tools.dotc.ast.tpd")
     override def foldOverTree(x: Unit, tree: Tree)(owner: Symbol): Unit = {
       try {
@@ -85,7 +56,7 @@ class WartUniverse(val quotes: Quotes, traverser: WartTraverser, onlyWarning: Bo
       } catch {
         case e: MatchError =>
           if (logLevel != LogLevel.Disable) {
-            warning(tree.pos, s"MatchError ${tree.getClass} ${owner.getClass}", traverser.simpleName)
+            warning(tree.pos, s"MatchError ${tree.getClass} ${owner.getClass}", "")
           }
       }
     }
