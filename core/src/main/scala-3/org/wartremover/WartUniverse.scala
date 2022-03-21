@@ -8,10 +8,6 @@ import java.lang.SuppressWarnings
 
 class WartUniverse(val quotes: Quotes, traverser: WartTraverser, onlyWarning: Boolean, logLevel: LogLevel) { self =>
   abstract class Traverser extends quotes.reflect.TreeTraverser {
-    private[this] def simpleName: String = traverser.getClass.getSimpleName.dropRight(1)
-    private[this] def fullName: String = traverser.getClass.getName.dropRight(1)
-
-    protected def messagePrefix = s"[wartremover:${simpleName}] "
     final implicit val q: self.quotes.type = self.quotes
     import q.reflect.*
 
@@ -75,7 +71,7 @@ class WartUniverse(val quotes: Quotes, traverser: WartTraverser, onlyWarning: Bo
         .flatten
         .toSet
 
-      args.contains(fullName) || args("org.wartremover.warts.All")
+      args.contains(traverser.fullName) || args("org.wartremover.warts.All")
     }
     @nowarn("msg=dotty.tools.dotc.ast.tpd")
     override def foldOverTree(x: Unit, tree: Tree)(owner: Symbol): Unit = {
@@ -89,19 +85,22 @@ class WartUniverse(val quotes: Quotes, traverser: WartTraverser, onlyWarning: Bo
       } catch {
         case e: MatchError =>
           if (logLevel != LogLevel.Disable) {
-            warning(self)(tree.pos, s"MatchError ${tree.getClass} ${owner.getClass}")
+            warning(tree.pos, s"MatchError ${tree.getClass} ${owner.getClass}", traverser.simpleName)
           }
       }
     }
-    protected final def warning(u: WartUniverse)(pos: u.quotes.reflect.Position, message: String): Unit = {
-      u.quotes.reflect.report.warning(messagePrefix + message, pos)
-    }
-    protected final def error(u: WartUniverse)(pos: u.quotes.reflect.Position, message: String): Unit = {
-      if (onlyWarning) {
-        u.quotes.reflect.report.warning(messagePrefix + message, pos)
-      } else {
-        u.quotes.reflect.report.error(messagePrefix + message, pos)
-      }
+  }
+
+  private[this] def withPrefix(name: String) = s"[wartremover:${name}] "
+
+  final def warning(pos: quotes.reflect.Position, message: String, wartName: String): Unit = {
+    quotes.reflect.report.warning(withPrefix(wartName) + message, pos)
+  }
+  final def error(pos: quotes.reflect.Position, message: String, wartName: String): Unit = {
+    if (onlyWarning) {
+      quotes.reflect.report.warning(withPrefix(wartName) + message, pos)
+    } else {
+      quotes.reflect.report.error(withPrefix(wartName) + message, pos)
     }
   }
 }

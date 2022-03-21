@@ -1,6 +1,15 @@
 package org.wartremover
 
 abstract class WartTraverser { self =>
+  private[wartremover] val simpleName: String = this.getClass.getSimpleName.dropRight(1)
+  private[wartremover] val fullName: String = this.getClass.getName.dropRight(1)
+
+  protected final def warning(u: WartUniverse)(pos: u.quotes.reflect.Position, message: String): Unit =
+    u.warning(pos = pos, message = message, wartName = simpleName)
+
+  protected final def error(u: WartUniverse)(pos: u.quotes.reflect.Position, message: String): Unit =
+    u.error(pos = pos, message = message, wartName = simpleName)
+
   def apply(u: WartUniverse): u.Traverser
 
   def compose(o: WartTraverser): WartTraverser = new WartTraverser {
