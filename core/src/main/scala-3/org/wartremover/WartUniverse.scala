@@ -54,7 +54,7 @@ class WartUniverse(onlyWarning: Boolean, logLevel: LogLevel, val quotes: Quotes)
         .flatten
         .toSet
 
-      args.contains(traverser.fullName) || args("org.wartremover.warts.All")
+      args(traverser.fullName) || args("org.wartremover.warts.All")
     }
 
     def sourceCodeContains(t: Tree, src: String): Boolean = {

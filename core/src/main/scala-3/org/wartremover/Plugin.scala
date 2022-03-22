@@ -15,7 +15,6 @@ class Plugin extends StandardPlugin {
     try {
       val clazz = Class.forName(name + NameTransformer.MODULE_SUFFIX_STRING)
       val field = clazz.getField(NameTransformer.MODULE_INSTANCE_NAME)
-      field.setAccessible(true)
       val instance = field.get(null)
       Right(instance.asInstanceOf[WartTraverser])
     } catch {
@@ -35,7 +34,7 @@ class Plugin extends StandardPlugin {
     val (errors2, warningWarts) = options.collect { case s"only-warn-traverser:${name}" =>
       loadWart(name)
     }.partitionMap(identity)
-    val loglevel: LogLevel = options.collect { case s"loglevel:${level}" =>
+    val loglevel = options.collect { case s"loglevel:${level}" =>
       LogLevel.map.get(level)
     }.flatten.headOption.getOrElse(LogLevel.Disable)
     val newPhase = new WartremoverPhase(
