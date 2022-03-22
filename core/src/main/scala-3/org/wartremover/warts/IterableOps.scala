@@ -1,7 +1,7 @@
 package org.wartremover
 package warts
 
-object TraversableOps extends WartTraverser {
+object IterableOps extends WartTraverser {
   def apply(u: WartUniverse): u.Traverser = {
     new u.Traverser(this) {
       import q.reflect.*

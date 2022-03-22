@@ -8,7 +8,7 @@ private[warts] object SafeWarts {
     DefaultArguments,
     EitherProjectionPartial,
     IsInstanceOf,
-    TraversableOps,
+    IterableOps,
     NonUnitStatements,
     Null,
     OptionPartial,

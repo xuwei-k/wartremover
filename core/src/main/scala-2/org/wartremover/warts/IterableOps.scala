@@ -1,10 +1,10 @@
 package org.wartremover
 package warts
 
-object TraversableOps extends WartTraverser {
+object IterableOps extends WartTraverser {
 
   class Op(name: String, error: String) extends WartTraverser {
-    override lazy val className = "org.wartremover.warts.TraversableOps"
+    override lazy val className = "org.wartremover.warts.IterableOps"
 
     def apply(u: WartUniverse): u.Traverser = {
       import u.universe._
