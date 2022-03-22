@@ -33,14 +33,14 @@ class WartUniverse(onlyWarning: Boolean, logLevel: LogLevel, val quotes: Quotes)
     }
 
     private[this] def hasWartAnnotationSymbol(s: Symbol): Boolean = {
-      val SuppressWarningsSymbol = TypeTree.of[java.lang.SuppressWarnings].symbol
+      val SuppressWarningsSymbol = TypeTree.of[SuppressWarnings].symbol
 
       val args: Set[String] = s
         .getAnnotation(SuppressWarningsSymbol)
         .collect {
           case a1 if a1.isExpr =>
             PartialFunction
-              .condOpt(a1.asExpr) { case '{ new java.lang.SuppressWarnings($a2: Array[String]) } =>
+              .condOpt(a1.asExpr) { case '{ new SuppressWarnings($a2: Array[String]) } =>
                 PartialFunction
                   .condOpt(a2.asTerm) { case Apply(Apply(_, Typed(e, _) :: Nil), _) =>
                     e.asExprOf[Seq[String]].value

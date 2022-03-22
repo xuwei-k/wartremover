@@ -5,6 +5,8 @@ import org.wartremover.warts.Overloading
 import org.scalatest.funsuite.AnyFunSuite
 
 class OverloadingTest2 extends AnyFunSuite with ResultAssertions {
+
+  // TODO Scala 3
   test("Overloading is disabled") {
     val result = WartTestTraverser(Overloading) {
       class c {

@@ -4,6 +4,7 @@ package test
 import org.wartremover.warts.Null
 import org.scalatest.funsuite.AnyFunSuite
 
+// TODO Scala 3 ?
 class NullTest2 extends AnyFunSuite with ResultAssertions {
   test("Null wart obeys SuppressWarnings in classes with default arguments") {
     val result = WartTestTraverser(Null) {
