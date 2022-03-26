@@ -7,6 +7,8 @@ import java.lang.reflect.Modifier
 
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
+def Scala3Nightly = "3.1.3-RC1-bin-20220325-6f3fe05-NIGHTLY"
+
 // compiler plugin should be fully cross-versioned. e.g.
 // - https://github.com/ghik/silencer/issues/31
 // - https://github.com/typelevel/kind-projector/issues/15
@@ -41,7 +43,7 @@ def latest(n: Int, versions: Seq[String]) = {
 val scalaCompilerDependency = Def.settings(
   libraryDependencies += {
     if (scalaBinaryVersion.value == "3") {
-      "org.scala-lang" %% "scala3-compiler" % scalaVersion.value
+      "org.scala-lang" %% "scala3-tasty-inspector" % scalaVersion.value
     } else {
       "org.scala-lang" % "scala-compiler" % scalaVersion.value
     }
@@ -141,8 +143,10 @@ def crossSrcSetting(c: Configuration) = {
 
 val coreSettings = Def.settings(
   commonSettings,
+  scalaVersion := Scala3Nightly,
   name := "wartremover",
   Test / fork := true,
+  run / fork := true,
   crossScalaVersions := allScalaVersions,
   Test / scalacOptions += {
     val hash = (Compile / sources).value.map { f =>
@@ -317,6 +321,7 @@ lazy val testMacros: Project = Project(
   base = file("test-macros")
 ).settings(
   baseSettings,
+  scalaVersion := Scala3Nightly,
   crossScalaVersions := allScalaVersions,
   publish / skip := true,
   publishArtifact := false,

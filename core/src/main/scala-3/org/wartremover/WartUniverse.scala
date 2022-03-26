@@ -17,9 +17,26 @@ object WartUniverse {
       override val quotes = q
     }
   }
+
+  def withReporter[Q <: Quotes](
+    onlyWarning: Boolean,
+    logLevel: LogLevel,
+    quotes: Q,
+    error: (String, quotes.reflect.Position) => Unit,
+    warn: (String, quotes.reflect.Position) => Unit,
+  ): Aux[Q] = {
+    type X = Q
+    val q: quotes.type = quotes
+    new WartUniverse(onlyWarning, logLevel) {
+      override type Q = X
+      override val quotes: q.type = q
+      override def onWarn(msg: String, pos: quotes.reflect.Position): Unit = error(msg, pos)
+      override def onError(msg: String, pos: quotes.reflect.Position): Unit = warn(msg, pos)
+    }
+  }
 }
 
-sealed abstract class WartUniverse(onlyWarning: Boolean, logLevel: LogLevel) { self =>
+abstract class WartUniverse(onlyWarning: Boolean, logLevel: LogLevel) { self =>
   type Q <: Quotes
   val quotes: Q
 
