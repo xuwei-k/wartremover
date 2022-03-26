@@ -23,6 +23,47 @@ object WartInspector {
   }
 
   def main(args: Array[String]): Unit = {
+    import coursier._
+    val jarNames = List(
+      "ast",
+      "core",
+      "ext",
+      "jackson-core",
+      "jackson",
+      "mongo",
+      "native-core",
+      "native",
+      "scalap",
+      "scalaz",
+      "xml"
+    ).map { x =>
+      coursier.core.Dependency(
+        coursier.core.Module(
+          coursier.core.Organization("org.json4s"),
+          coursier.core.ModuleName(s"json4s-${x}_3"),
+          Map.empty
+        ),
+        "4.1.0-M1"
+      )
+    }
+    val jars = Fetch().addDependencies(jarNames: _*).run()
+    jars.foreach(println)
+    run(
+      traverser = List[WartTraverser](
+        org.wartremover.warts.CollectHeadOption,
+        org.wartremover.warts.SizeIs,
+        org.wartremover.warts.FilterHeadOption,
+        org.wartremover.warts.SortFilter,
+      ).reduceLeft(_ compose _),
+      jars = jars.map(_.getAbsolutePath).toList,
+      dependenciesClasspath = Nil
+    )
+  }
+
+  case class Result(message: String, line: Int, path: String)
+
+  def run(traverser: WartTraverser, jars: List[String], dependenciesClasspath: List[String]): List[Result] = {
+    val results = List.newBuilder[Result]
     val inspector = new Inspector {
       def inspect(using q: Quotes)(tastys: List[Tasty[q.type]]): Unit = {
         import q.reflect.*
@@ -31,6 +72,11 @@ object WartInspector {
           logLevel = LogLevel.Info,
           quotes = q,
           error = (msg, pos) => {
+            results += Result(
+              message = msg,
+              line = pos.startLine,
+              path = pos.sourceFile.path
+            )
             println(
               Seq[(String, Any)](
                 "message" -> msg,
@@ -44,12 +90,7 @@ object WartInspector {
           },
           warn = (msg, pos) => println((msg, pos)),
         )
-        val traverser = List[WartTraverser](
-//          org.wartremover.warts.CollectHeadOption,
-          org.wartremover.warts.SizeIs,
-          //         org.wartremover.warts.FilterHeadOption,
-          //        org.wartremover.warts.SortFilter,
-        ).reduceLeft(_ compose _).apply(universe)
+        val treeTraverser = traverser.apply(universe)
         val count = tastys.size
         val x = math.max(count / 30, 1).toInt
         println("tasty file count = " + count)
@@ -61,16 +102,15 @@ object WartInspector {
           // compiler crash if remove explicit `Tree` type
           // https://github.com/lampepfl/dotty/issues/14785
           val tree: Tree = tasty.ast
-          traverser.traverseTree(tree)(tree.symbol)
+          treeTraverser.traverseTree(tree)(tree.symbol)
         }
       }
     }
-    val classpath = System.getProperty("java.class.path").split(':').toList
-    classpath.map(_.split('/').last).sorted.foreach(println)
     TastyInspector.inspectAllTastyFiles(
       tastyFiles = Nil,
-      jars = jarPathFromType[dotty.tools.dotc.Compiler] :: Nil,
-      dependenciesClasspath = classpath
+      jars = jars,
+      dependenciesClasspath = dependenciesClasspath,
     )(inspector)
+    results.result()
   }
 }

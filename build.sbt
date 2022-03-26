@@ -144,6 +144,14 @@ def crossSrcSetting(c: Configuration) = {
 val coreSettings = Def.settings(
   commonSettings,
   scalaVersion := Scala3Nightly,
+  libraryDependencies += "io.get-coursier" % "coursier" % "2.1.0-M5" cross CrossVersion.for3Use2_13,
+  conflictWarning := {
+    if (scalaBinaryVersion.value == "3") {
+      ConflictWarning("warn", Level.Warn, false)
+    } else {
+      conflictWarning.value
+    }
+  },
   name := "wartremover",
   Test / fork := true,
   run / fork := true,
