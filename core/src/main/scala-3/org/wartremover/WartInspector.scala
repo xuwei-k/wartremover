@@ -23,7 +23,6 @@ object WartInspector {
   }
 
   def main(args: Array[String]): Unit = {
-    val reporter = new test.WartReporter()
     val inspector = new Inspector {
       def inspect(using q: Quotes)(tastys: List[Tasty[q.type]]): Unit = {
         import q.reflect.*
@@ -31,7 +30,18 @@ object WartInspector {
           onlyWarning = true,
           logLevel = LogLevel.Info,
           quotes = q,
-          error = (msg, pos) => println((msg, pos)),
+          error = (msg, pos) => {
+            println(
+              Seq[(String, Any)](
+                "message" -> msg,
+                "file" -> pos.sourceFile,
+                "startLine" -> pos.startLine,
+                "endLine" -> pos.endLine,
+                "startColumn" -> pos.startColumn,
+                "endColumn" -> pos.endColumn
+              ).map { (k, v) => s"$k = $v" }.mkString(", ")
+            )
+          },
           warn = (msg, pos) => println((msg, pos)),
         )
         val traverser = List[WartTraverser](
@@ -49,21 +59,18 @@ object WartInspector {
           }
 
           // compiler crash if remove explicit `Tree` type
-          // TODO report bug?
+          // https://github.com/lampepfl/dotty/issues/14785
           val tree: Tree = tasty.ast
           traverser.traverseTree(tree)(tree.symbol)
         }
       }
     }
     val classpath = System.getProperty("java.class.path").split(':').toList
-    classpath.sorted.foreach(println)
+    classpath.map(_.split('/').last).sorted.foreach(println)
     TastyInspector.inspectAllTastyFiles(
       tastyFiles = Nil,
       jars = jarPathFromType[dotty.tools.dotc.Compiler] :: Nil,
       dependenciesClasspath = classpath
     )(inspector)
-    val result = reporter.result
-    println(result.size)
-    result.foreach(println)
   }
 }
