@@ -22,6 +22,23 @@ object WartInspector {
     ).mkString("/")
   }
 
+  extension (groupId: String) {
+    def %(artifactId: String): coursier.core.Module =
+      coursier.core.Module(
+        coursier.core.Organization(groupId),
+        coursier.core.ModuleName(artifactId),
+        Map.empty
+      )
+
+    def %%(artifactId: String): coursier.core.Module =
+      %(artifactId + "_3")
+  }
+
+  extension (module: coursier.core.Module) {
+    def %(version: String): coursier.core.Dependency =
+      coursier.core.Dependency(module, version)
+  }
+
   def main(args: Array[String]): Unit = {
     /*
     val jarNames = List(
@@ -47,25 +64,16 @@ object WartInspector {
       )
     }
      */
+
     val jarNames = args match {
       case Array(groupId, artifactId, version) =>
-        coursier.core.Dependency(
-          coursier.core.Module(
-            coursier.core.Organization(groupId),
-            coursier.core.ModuleName(artifactId + "_3"),
-            Map.empty
-          ),
-          version
-        ) :: Nil
+        (groupId %% artifactId % version) :: Nil
       case _ =>
-        coursier.core.Dependency(
-          coursier.core.Module(
-            coursier.core.Organization("io.circe"),
-            coursier.core.ModuleName(s"circe-generic_3"),
-            Map.empty
-          ),
-          "0.14.1"
-        ) :: Nil
+        List(
+          "org.scalikejdbc" %% "scalikejdbc-core" % "4.0.0",
+          "commons-dbcp" % "commons-dbcp" % "1.4",
+          "com.jolbox" % "bonecp" % "0.8.0.RELEASE",
+        )
     }
     val jars = coursier.Fetch().addDependencies(jarNames: _*).run()
     jars.map(_.toString.split("/maven2/").last).foreach(println)
