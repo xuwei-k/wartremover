@@ -130,7 +130,13 @@ object WartInspector {
           // compiler crash if remove explicit `Tree` type
           // https://github.com/lampepfl/dotty/issues/14785
           val tree: Tree = tasty.ast
-          treeTraverser.traverseTree(tree)(tree.symbol)
+          try {
+            treeTraverser.traverseTree(tree)(tree.symbol)
+          } catch {
+            case e: Throwable =>
+              println((tasty.path, e))
+              throw e
+          }
         }
       }
     }
