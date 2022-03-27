@@ -23,6 +23,7 @@ object WartInspector {
   }
 
   def main(args: Array[String]): Unit = {
+    /*
     val jarNames = List(
       "ast",
       "core",
@@ -45,8 +46,29 @@ object WartInspector {
         "4.1.0-M1"
       )
     }
+     */
+    val jarNames = args match {
+      case Array(groupId, artifactId, version) =>
+        coursier.core.Dependency(
+          coursier.core.Module(
+            coursier.core.Organization(groupId),
+            coursier.core.ModuleName(artifactId + "_3"),
+            Map.empty
+          ),
+          version
+        ) :: Nil
+      case _ =>
+        coursier.core.Dependency(
+          coursier.core.Module(
+            coursier.core.Organization("io.circe"),
+            coursier.core.ModuleName(s"circe-generic_3"),
+            Map.empty
+          ),
+          "0.14.1"
+        ) :: Nil
+    }
     val jars = coursier.Fetch().addDependencies(jarNames: _*).run()
-    jars.foreach(println)
+    jars.map(_.toString.split("/maven2/").last).foreach(println)
     println("*" * 100)
     val result = run(
       traverser = List[WartTraverser](
