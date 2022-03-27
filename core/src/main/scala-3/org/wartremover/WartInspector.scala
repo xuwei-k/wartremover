@@ -48,7 +48,8 @@ object WartInspector {
     }
     val jars = Fetch().addDependencies(jarNames: _*).run()
     jars.foreach(println)
-    run(
+    println("*" * 100)
+    val result = run(
       traverser = List[WartTraverser](
         org.wartremover.warts.CollectHeadOption,
         org.wartremover.warts.SizeIs,
@@ -58,6 +59,8 @@ object WartInspector {
       jars = jars.map(_.getAbsolutePath).toList,
       dependenciesClasspath = Nil
     )
+    println("*" * 100)
+    result.foreach(println)
   }
 
   case class Result(message: String, line: Int, path: String)
