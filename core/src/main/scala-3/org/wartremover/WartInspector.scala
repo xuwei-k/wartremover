@@ -23,7 +23,6 @@ object WartInspector {
   }
 
   def main(args: Array[String]): Unit = {
-    import coursier._
     val jarNames = List(
       "ast",
       "core",
@@ -46,14 +45,20 @@ object WartInspector {
         "4.1.0-M1"
       )
     }
-    val jars = Fetch().addDependencies(jarNames: _*).run()
+    val jars = coursier.Fetch().addDependencies(jarNames: _*).run()
     jars.foreach(println)
     println("*" * 100)
     val result = run(
       traverser = List[WartTraverser](
         org.wartremover.warts.CollectHeadOption,
-        org.wartremover.warts.SizeIs,
+        org.wartremover.warts.DropTakeToSlice,
         org.wartremover.warts.FilterHeadOption,
+        org.wartremover.warts.FilterSize,
+        org.wartremover.warts.GetGetOrElse,
+        org.wartremover.warts.GetOrElseNull,
+        org.wartremover.warts.ReverseFind,
+        org.wartremover.warts.ReverseTakeReverse,
+        org.wartremover.warts.SizeIs,
         org.wartremover.warts.SortFilter,
       ).reduceLeft(_ compose _),
       jars = jars.map(_.getAbsolutePath).toList,
@@ -70,29 +75,28 @@ object WartInspector {
     val inspector = new Inspector {
       def inspect(using q: Quotes)(tastys: List[Tasty[q.type]]): Unit = {
         import q.reflect.*
-        val universe: WartUniverse.Aux[q.type] = WartUniverse.withReporter(
-          onlyWarning = true,
-          logLevel = LogLevel.Info,
-          quotes = q,
-          error = (msg, pos) => {
+        val universe: WartUniverse.Aux[q.type] = new WartUniverse(onlyWarning = false, logLevel = LogLevel.Debug) {
+          override type Q = q.type
+          override val quotes: q.type = q
+          override def onError(msg: String, pos: quotes.reflect.Position): Unit = {
+            super.onError(msg, pos)
             results += Result(
               message = msg,
               line = pos.startLine,
               path = pos.sourceFile.path
             )
             println(
-              Seq[(String, Any)](
+              Seq[(String, String | Int)](
                 "message" -> msg,
-                "file" -> pos.sourceFile,
+                "path" -> pos.sourceFile.path,
                 "startLine" -> pos.startLine,
                 "endLine" -> pos.endLine,
                 "startColumn" -> pos.startColumn,
                 "endColumn" -> pos.endColumn
               ).map { (k, v) => s"$k = $v" }.mkString(", ")
             )
-          },
-          warn = (msg, pos) => println((msg, pos)),
-        )
+          }
+        }
         val treeTraverser = traverser.apply(universe)
         val count = tastys.size
         val x = math.max(count / 30, 1).toInt
@@ -101,7 +105,6 @@ object WartInspector {
           if (i % x == 0) {
             println(s"inspecting $i / $count")
           }
-
           // compiler crash if remove explicit `Tree` type
           // https://github.com/lampepfl/dotty/issues/14785
           val tree: Tree = tasty.ast
