@@ -49,18 +49,27 @@ object WartInspector {
     jars.map(_.toString.split("/maven2/").last).sorted.foreach(println)
     println("*" * 100)
     val result = run(
-      traverser = List[WartTraverser](
-        org.wartremover.warts.CollectHeadOption,
-        org.wartremover.warts.DropTakeToSlice,
-        org.wartremover.warts.FilterHeadOption,
-        org.wartremover.warts.FilterSize,
-        org.wartremover.warts.GetGetOrElse,
-        org.wartremover.warts.GetOrElseNull,
-        org.wartremover.warts.ReverseFind,
-        org.wartremover.warts.ReverseTakeReverse,
-        org.wartremover.warts.SizeIs,
-        org.wartremover.warts.SortFilter,
-      ).reduceLeft(_ compose _),
+      traverser = {
+        import org.wartremover.warts.*
+        List[WartTraverser](
+          ArrayEquals,
+          CollectHeadOption,
+          DropTakeToSlice,
+          FilterHeadOption,
+          FilterSize,
+          GetGetOrElse,
+          GetOrElseNull,
+          ListAppend,
+          ListUnapply,
+          RedundantConversions,
+          ReverseFind,
+          ReverseTakeReverse,
+          ScalaApp,
+          SizeIs,
+          SortFilter,
+          ThreadSleep,
+        ).reduceLeft(_ compose _)
+      },
       jars = jars.map(_.getAbsolutePath).toList,
       dependenciesClasspath = Nil
     )
