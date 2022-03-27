@@ -7,19 +7,12 @@ import scala.tasty.inspector.TastyInspector
 import scala.reflect.ClassTag
 
 object WartInspector {
-  def jarPathFromType[A](implicit c: ClassTag[A]): String = {
-    c.runtimeClass.getProtectionDomain.getCodeSource.getLocation.getPath
+  def timeString(): String = {
+    java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(java.time.ZonedDateTime.now())
   }
 
-  def jarPathFromCoursierCache(groupId: String, artifactId: String, version: String): String = {
-    List(
-      scala.util.Properties.userHome,
-      "Library/Caches/Coursier/v1/https/repo1.maven.org/maven2",
-      groupId.replace('.', '/'),
-      artifactId + "_3",
-      version,
-      artifactId + "_3-" + version + ".jar"
-    ).mkString("/")
+  def jarPathFromType[A](implicit c: ClassTag[A]): String = {
+    c.runtimeClass.getProtectionDomain.getCodeSource.getLocation.getPath
   }
 
   extension (groupId: String) {
@@ -40,34 +33,11 @@ object WartInspector {
   }
 
   def main(args: Array[String]): Unit = {
-    /*
-    val jarNames = List(
-      "ast",
-      "core",
-      "ext",
-      "jackson-core",
-      "jackson",
-      "mongo",
-      "native-core",
-      "native",
-      "scalap",
-      "scalaz",
-      "xml"
-    ).map { x =>
-      coursier.core.Dependency(
-        coursier.core.Module(
-          coursier.core.Organization("org.json4s"),
-          coursier.core.ModuleName(s"json4s-${x}_3"),
-          Map.empty
-        ),
-        "4.1.0-M1"
-      )
-    }
-     */
-
     val jarNames = args match {
       case Array(groupId, artifactId, version) =>
         (groupId %% artifactId % version) :: Nil
+      case Array(groupId, artifactId) =>
+        (groupId %% artifactId % "latest.release") :: Nil
       case _ =>
         List(
           "org.scalikejdbc" %% "scalikejdbc-core" % "4.0.0",
@@ -76,7 +46,7 @@ object WartInspector {
         )
     }
     val jars = coursier.Fetch().addDependencies(jarNames: _*).run()
-    jars.map(_.toString.split("/maven2/").last).foreach(println)
+    jars.map(_.toString.split("/maven2/").last).sorted.foreach(println)
     println("*" * 100)
     val result = run(
       traverser = List[WartTraverser](
@@ -133,7 +103,7 @@ object WartInspector {
         println("tasty file count = " + count)
         tastys.zipWithIndex.foreach { (tasty, i) =>
           if (i % x == 0) {
-            println(s"inspecting $i / $count")
+            println(s"[${timeString()}] inspecting $i / $count")
           }
           // compiler crash if remove explicit `Tree` type
           // https://github.com/lampepfl/dotty/issues/14785
