@@ -1,5 +1,6 @@
 package org.wartremover
 
+import coursier.util.Artifact
 import scala.quoted.Quotes
 import scala.tasty.inspector.Inspector
 import scala.tasty.inspector.Tasty
@@ -45,41 +46,66 @@ object WartInspector {
           "com.jolbox" % "bonecp" % "0.8.0.RELEASE",
         )
     }
-    val jars = coursier.Fetch().addDependencies(jarNames: _*).run()
+    val csResult = coursier.Fetch().addDependencies(jarNames: _*).runResult()
+    val pomList = csResult.artifacts.flatMap(_._1.extra.map(_._2)).map(_.url).filter(_.endsWith(".pom"))
+    pomList.sorted.foreach(println)
+    val jars = csResult.files
+    println("*" * 100)
+    println("pom count = " + pomList.size + ", jar count = " + jars.size)
     jars.map(_.toString.split("/maven2/").last).sorted.foreach(println)
     println("*" * 100)
-    val result = run(
-      traverser = {
-        import org.wartremover.warts.*
-        List[WartTraverser](
-          ArrayEquals,
-          CollectHeadOption,
-          DropTakeToSlice,
-          FilterHeadOption,
-          FilterSize,
-          GetGetOrElse,
-          GetOrElseNull,
-          ListAppend,
-          ListUnapply,
-          RedundantConversions,
-          ReverseFind,
-          ReverseTakeReverse,
-          ScalaApp,
-          SizeIs,
-          SortFilter,
-          ThreadSleep,
-        ).reduceLeft(_ compose _)
-      },
-      jars = jars.map(_.getAbsolutePath).toList,
-      dependenciesClasspath = Nil
-    )
-    println("*" * 100)
-    result.foreach(println)
+    jars
+      .lazyZip(pomList)
+      .filter { (jar, pom) =>
+        pom.contains("_3/") && pom.contains("_3-")
+      }
+      .foreach { (jar, pom) =>
+        println("start inspect " + jar)
+        val result = run(
+          traverser = {
+            import org.wartremover.warts.*
+            List[WartTraverser](
+              ArrayEquals,
+              CollectHeadOption,
+              DropTakeToSlice,
+              FilterHeadOption,
+              FilterSize,
+              GetGetOrElse,
+              GetOrElseNull,
+              ListAppend,
+              ListUnapply,
+              RedundantConversions,
+              ReverseFind,
+              ReverseTakeReverse,
+              ScalaApp,
+              SizeIs,
+              SortFilter,
+              ThreadSleep,
+            ).reduceLeft(_ compose _)
+          },
+          jars = jar.getAbsolutePath :: Nil,
+          dependenciesClasspath = jars.map(_.getAbsolutePath).toList,
+          githubUrl = {
+            val pomXml = scala.xml.XML.load(new java.net.URL(pom))
+            Option((pomXml \ "scm" \ "url").text).filter(_.trim.nonEmpty).map {
+              _ + "/blob/" + Option((pomXml \ "version").text).filter(_.trim.nonEmpty).map("v" + _).getOrElse("main")
+            }
+          }
+        )
+        println("end inspect " + jar)
+        println("*" * 100)
+        result.foreach(println)
+      }
   }
 
   case class Result(message: String, line: Int, path: String)
 
-  def run(traverser: WartTraverser, jars: List[String], dependenciesClasspath: List[String]): List[Result] = {
+  def run(
+    traverser: WartTraverser,
+    jars: List[String],
+    dependenciesClasspath: List[String],
+    githubUrl: Option[String]
+  ): List[Result] = {
     val results = List.newBuilder[Result]
     val inspector = new Inspector {
       def inspect(using q: Quotes)(tastys: List[Tasty[q.type]]): Unit = {
@@ -89,17 +115,27 @@ object WartInspector {
           override val quotes: q.type = q
           override def onError(msg: String, pos: quotes.reflect.Position): Unit = {
             super.onError(msg, pos)
+            val startLine = pos.startLine + 1
+            val endLine = pos.endLine + 1
             results += Result(
               message = msg,
-              line = pos.startLine,
+              line = startLine,
               path = pos.sourceFile.path
             )
+            githubUrl.foreach { url =>
+              val line = if (startLine == endLine) {
+                "#L" + startLine
+              } else {
+                "#L" + startLine + "-L" + endLine
+              }
+              println(url + "/" + pos.sourceFile.path + line)
+            }
             println(
               Seq[(String, String | Int)](
                 "message" -> msg,
                 "path" -> pos.sourceFile.path,
-                "startLine" -> pos.startLine,
-                "endLine" -> pos.endLine,
+                "startLine" -> startLine,
+                "endLine" -> endLine,
                 "startColumn" -> pos.startColumn,
                 "endColumn" -> pos.endColumn
               ).map { (k, v) => s"$k = $v" }.mkString(", ")
