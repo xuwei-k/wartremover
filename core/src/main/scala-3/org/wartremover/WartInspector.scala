@@ -59,6 +59,9 @@ object WartInspector {
       .filter { (jar, pom) =>
         pom.contains("_3/") && pom.contains("_3-")
       }
+      .filterNot { (jar, pom) =>
+        pom.contains("/scala3-library_3/")
+      }
       .foreach { (jar, pom) =>
         println("start inspect " + jar)
         val result = run(
@@ -87,8 +90,14 @@ object WartInspector {
           dependenciesClasspath = jars.map(_.getAbsolutePath).toList,
           githubUrl = {
             val pomXml = scala.xml.XML.load(new java.net.URL(pom))
-            Option((pomXml \ "scm" \ "url").text).filter(_.trim.nonEmpty).map {
-              _ + "/blob/" + Option((pomXml \ "version").text).filter(_.trim.nonEmpty).map("v" + _).getOrElse("main")
+            val baseOpt = Option((pomXml \ "scm" \ "url").text).filter(_.trim.nonEmpty).map {
+              case s"${other}github.com:${user}/${repo}.git" =>
+                s"https://github.com/${user}/${repo}/blob/"
+              case s"${other}github.com/${user}/${repo}" =>
+                s"https://github.com/${user}/${repo}/blob/"
+            }
+            baseOpt.map {
+              _ + Option((pomXml \ "version").text).filter(_.trim.nonEmpty).map("v" + _).getOrElse("main")
             }
           }
         )
