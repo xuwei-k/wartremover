@@ -11,6 +11,7 @@ import sbt.librarymanagement.ivy.IvyDependencyResolution
 object WartRemover extends sbt.AutoPlugin {
   override def trigger = allRequirements
   object autoImport {
+    val wartremoverInspect = taskKey[Unit]("run wartremover by TASTy inspector")
     val wartremoverErrors = settingKey[Seq[Wart]]("List of Warts that will be reported as compilation errors.")
     val wartremoverWarnings = settingKey[Seq[Wart]]("List of Warts that will be reported as compilation warnings.")
     val wartremoverExcluded = taskKey[Seq[File]]("List of files to be excluded from all checks.")
@@ -30,6 +31,61 @@ object WartRemover extends sbt.AutoPlugin {
     autoImport.wartremoverExcluded := Nil,
     autoImport.wartremoverClasspaths := Nil
   )
+
+  final case class InspectArg(
+    tastyFiles: Seq[String],
+    dependenciesClasspath: Seq[String],
+    warts: Seq[Wart]
+  )
+
+  private[this] val runInspector = taskKey[InspectArg => Unit]("")
+
+  private[this] def generateProject = {
+    val id = "wartremover-inspector-project"
+    Project(id = id, base = file("target") / id).settings(
+      scalaVersion := "3.1.3-RC1-bin-20220330-ee6733a-NIGHTLY",
+      runInspector := {
+        val clazz = (Test / testLoader).value.loadClass("WartRemoverTastyInspector$")
+        (arg: InspectArg) => {
+          val instance = clazz.getConstructor().newInstance()
+          val method = instance.asInstanceOf[
+            {
+              def run(
+                tastyFiles: Array[String],
+                dependenciesClasspath: Array[String],
+                warts: Array[String]
+              ): Unit
+            }
+          ]
+          method.run(
+            tastyFiles = arg.tastyFiles.toArray,
+            dependenciesClasspath = arg.dependenciesClasspath.toArray,
+            warts = arg.warts.map(_.clazz).toArray
+          )
+        }
+      },
+      libraryDependencies += {
+        "org.wartremover" %% "wartremover" % Wart.PluginVersion cross autoImport.wartremoverCrossVersion.value
+      },
+      Compile / sourceGenerators += task {
+        val fileName = "WartRemoverInspector.scala"
+        val input = WartRemover.getClass.getResourceAsStream("/" + fileName)
+        val src = scala.io.Source.fromInputStream(input).getLines().mkString("\n")
+        val f = (Compile / resourceManaged).value / fileName
+        IO.write(f, src)
+        Seq(f)
+      },
+    )
+  }
+
+  // avoid extraProjects https://github.com/sbt/sbt/issues/4947
+  override def derivedProjects(proj: ProjectDefinition[?]): Seq[Project] = {
+    if (proj.projectOrigin == ProjectOrigin.Organic) {
+      Seq(generateProject)
+    } else {
+      Nil
+    }
+  }
 
   private[this] def copyToCompilerPluginJarsDir(
     src: File,
@@ -103,6 +159,16 @@ object WartRemover extends sbt.AutoPlugin {
       Seq(
         compilerPlugin(
           "org.wartremover" %% "wartremover" % Wart.PluginVersion cross autoImport.wartremoverCrossVersion.value
+        )
+      )
+    },
+    autoImport.wartremoverInspect := {
+      val task = (generateProject / runInspector).value
+      task(
+        InspectArg(
+          tastyFiles = (Compile / tastyFiles).value.map(_.getAbsolutePath),
+          dependenciesClasspath = (Compile / fullClasspath).value.map(_.data.getAbsolutePath),
+          warts = autoImport.wartremoverErrors.value,
         )
       )
     },
