@@ -1,6 +1,7 @@
 package wartremover
 
 import java.nio.file.Path
+import java.net.URL
 import sbt._
 import sbt.Keys._
 import sbt.internal.librarymanagement.IvySbt
@@ -11,6 +12,9 @@ import sbt.librarymanagement.ivy.IvyDependencyResolution
 object WartRemover extends sbt.AutoPlugin {
   override def trigger = allRequirements
   object autoImport {
+    val wartremoverInspect = taskKey[Unit]("run wartremover by TASTy inspector")
+    val wartremoverInspectFailOnErrors = settingKey[Boolean]("")
+    val wartremoverInspectScalaVersion = settingKey[String]("scala version for wartremoverInspect task")
     val wartremoverErrors = settingKey[Seq[Wart]]("List of Warts that will be reported as compilation errors.")
     val wartremoverWarnings = settingKey[Seq[Wart]]("List of Warts that will be reported as compilation warnings.")
     val wartremoverExcluded = taskKey[Seq[File]]("List of files to be excluded from all checks.")
@@ -24,6 +28,10 @@ object WartRemover extends sbt.AutoPlugin {
   import autoImport._
 
   override def globalSettings = Seq(
+    wartremoverInspectScalaVersion := {
+      // need NIGHTLY version because there are some bugs in old tasty-inspector.
+      "3.1.3-RC1-bin-20220330-ee6733a-NIGHTLY",
+    },
     wartremoverCrossVersion := CrossVersion.full,
     wartremoverDependencies := Nil,
     wartremoverErrors := Nil,
@@ -31,6 +39,36 @@ object WartRemover extends sbt.AutoPlugin {
     wartremoverExcluded := Nil,
     wartremoverClasspaths := Nil
   )
+
+  private[this] lazy val generateProject = {
+    val id = "wartremover-inspector-project"
+    Project(id = id, base = file("target") / id).settings(
+      run / fork := true,
+      fork := true,
+      autoScalaLibrary := false,
+      scalaVersion := wartremoverInspectScalaVersion.value,
+      libraryDependencies := {
+        if (scalaBinaryVersion.value == "3") {
+          Seq(
+            "org.scala-lang" % "scala3-tasty-inspector_3" % wartremoverInspectScalaVersion.value,
+            "org.wartremover" % "wartremover-inspector_3" % Wart.PluginVersion,
+          )
+        } else {
+          Nil
+        }
+      }
+    )
+  }
+
+  // avoid extraProjects https://github.com/sbt/sbt/issues/4947
+  override def derivedProjects(proj: ProjectDefinition[?]): Seq[Project] = {
+    proj.projectOrigin match {
+      case ProjectOrigin.DerivedProject =>
+        Nil
+      case _ =>
+        Seq(generateProject)
+    }
+  }
 
   private[this] def copyToCompilerPluginJarsDir(
     src: File,
@@ -105,6 +143,79 @@ object WartRemover extends sbt.AutoPlugin {
         compilerPlugin(
           "org.wartremover" %% "wartremover" % Wart.PluginVersion cross wartremoverCrossVersion.value
         )
+      )
+    },
+    Seq(Compile, Test).flatMap { x =>
+      Seq(
+        x / wartremoverInspectFailOnErrors := true,
+        x / wartremoverInspect := {
+          val log = streams.value.log
+          val s = state.value
+          val extracted = Project.extract(s)
+          val myProject = thisProjectRef.value
+          def skipLog(reason: String) = {
+            val thisTaskName = s"${myProject.project}/${x.name}/${wartremoverInspect.key.label}"
+            log.info(s"skip ${thisTaskName} because ${reason}")
+          }
+          if (scalaBinaryVersion.value == "3") {
+            val errorWarts = (x / wartremoverInspect / wartremoverErrors).value
+            val warningWarts = (x / wartremoverInspect / wartremoverWarnings).value
+            if (errorWarts.isEmpty && warningWarts.isEmpty) {
+              skipLog("warts is empty")
+            } else {
+              val tastys = extracted.runTask(myProject / x / tastyFiles, s)._2
+              if (tastys.isEmpty) {
+                skipLog(s"${tastyFiles.key.label} is empty")
+              } else {
+                import scala.language.reflectiveCalls
+                val loader = extracted.runTask(generateProject / Test / testLoader, s)._2
+                val clazz = loader.loadClass("org.wartremover.WartRemoverTastyInspector")
+                val instance = clazz.getConstructor().newInstance()
+                val method = instance.asInstanceOf[
+                  {
+                    def run(
+                      tastyFiles: Array[String],
+                      dependenciesClasspath: Array[String],
+                      wartClasspath: Array[URL],
+                      errorWarts: Array[String],
+                      warningWarts: Array[String]
+                    ): Int
+                  }
+                ]
+                log.info(
+                  s"running ${myProject.project}/${x.name}/${wartremoverInspect.key.label}. errorWarts = ${errorWarts}, warningWarts = ${warningWarts}"
+                )
+                val errorCount = method.run(
+                  tastyFiles = tastys.map(_.getAbsolutePath).toArray,
+                  dependenciesClasspath = (x / fullClasspath).value.map(_.data.getAbsolutePath).toArray,
+                  wartClasspath = {
+                    extracted
+                      .runTask(myProject / x / wartremoverClasspaths, s)
+                      ._2
+                      .map {
+                        case a if a.startsWith("file:") =>
+                          file(a.drop("file:".length)).getCanonicalFile.toURI.toURL
+                        case a =>
+                          new URL(a)
+                      }
+                      .toArray
+                  },
+                  errorWarts = errorWarts.map(_.clazz).toArray,
+                  warningWarts = warningWarts.map(_.clazz).toArray
+                )
+                if (errorCount != 0 && (x / wartremoverInspectFailOnErrors).value) {
+                  sys.error(s"[${myProject.project}] wart error found")
+                } else {
+                  log.info(
+                    s"finished ${myProject.project}/${x.name}/${wartremoverInspect.key.label}"
+                  )
+                }
+              }
+            }
+          } else {
+            skipLog(s"scalaVersion is ${scalaVersion.value}. not Scala 3")
+          }
+        }
       )
     },
     scalacOptionSetting(scalacOptions),
