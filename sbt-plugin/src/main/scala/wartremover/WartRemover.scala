@@ -1,16 +1,26 @@
 package wartremover
 
+import org.wartremover.InspectParam
+import org.wartremover.InspectResult
 import java.nio.file.Path
-import sbt._
-import sbt.Keys._
+import java.net.URL
+import sbt.*
+import sbt.Keys.*
 import sbt.internal.librarymanagement.IvySbt
 import sbt.librarymanagement.UnresolvedWarningConfiguration
 import sbt.librarymanagement.UpdateConfiguration
 import sbt.librarymanagement.ivy.IvyDependencyResolution
+import sjsonnew.JsonFormat
+import sjsonnew.support.scalajson.unsafe.CompactPrinter
 
 object WartRemover extends sbt.AutoPlugin {
   override def trigger = allRequirements
   object autoImport {
+    val wartremoverFailIfWartLoadError = settingKey[Boolean]("")
+    val wartremoverInspect = taskKey[InspectResult]("run wartremover by TASTy inspector")
+    val wartremoverInspectOutputStandardReporter = settingKey[Boolean]("")
+    val wartremoverInspectFailOnErrors = settingKey[Boolean]("")
+    val wartremoverInspectScalaVersion = settingKey[String]("scala version for wartremoverInspect task")
     val wartremoverErrors = settingKey[Seq[Wart]]("List of Warts that will be reported as compilation errors.")
     val wartremoverWarnings = settingKey[Seq[Wart]]("List of Warts that will be reported as compilation warnings.")
     val wartremoverExcluded = taskKey[Seq[File]]("List of files to be excluded from all checks.")
@@ -24,6 +34,10 @@ object WartRemover extends sbt.AutoPlugin {
   import autoImport._
 
   override def globalSettings = Seq(
+    wartremoverInspectScalaVersion := {
+      // need NIGHTLY version because there are some bugs in old tasty-inspector.
+      "3.1.3-RC1-bin-20220401-4a96ce7-NIGHTLY"
+    },
     wartremoverCrossVersion := CrossVersion.full,
     wartremoverDependencies := Nil,
     wartremoverErrors := Nil,
@@ -31,6 +45,36 @@ object WartRemover extends sbt.AutoPlugin {
     wartremoverExcluded := Nil,
     wartremoverClasspaths := Nil
   )
+
+  private[this] lazy val generateProject = {
+    val id = "wartremover-inspector-project"
+    Project(id = id, base = file("target") / id).settings(
+      run / fork := true,
+      fork := true,
+      autoScalaLibrary := false,
+      scalaVersion := wartremoverInspectScalaVersion.value,
+      libraryDependencies := {
+        if (scalaBinaryVersion.value == "3") {
+          Seq(
+            "org.scala-lang" % "scala3-tasty-inspector_3" % wartremoverInspectScalaVersion.value,
+            "org.wartremover" % "wartremover-inspector_3" % Wart.PluginVersion,
+          )
+        } else {
+          Nil
+        }
+      }
+    )
+  }
+
+  // avoid extraProjects https://github.com/sbt/sbt/issues/4947
+  override def derivedProjects(proj: ProjectDefinition[?]): Seq[Project] = {
+    proj.projectOrigin match {
+      case ProjectOrigin.DerivedProject =>
+        Nil
+      case _ =>
+        Seq(generateProject)
+    }
+  }
 
   private[this] def copyToCompilerPluginJarsDir(
     src: File,
@@ -99,12 +143,165 @@ object WartRemover extends sbt.AutoPlugin {
     }
   }
 
+  private[this] implicit val inspectParamFormat: JsonFormat[InspectParam] = {
+    import sjsonnew.BasicJsonProtocol.*
+    caseClass7(InspectParam, InspectParam.unapply)(
+      "tastyFiles",
+      "dependenciesClasspath",
+      "wartClasspath",
+      "errorWarts",
+      "warningWarts",
+      "failIfWartLoadError",
+      "outputStandardReporter",
+    )
+  }
+
+  private[this] implicit val inspectResultFormat: JsonFormat[InspectResult] = {
+    import sjsonnew.BasicJsonProtocol.*
+
+    implicit val sourceFileInstance: JsonFormat[org.wartremover.SourceFile] =
+      caseClass2(org.wartremover.SourceFile, org.wartremover.SourceFile.unapply)(
+        "name",
+        "path",
+      )
+
+    implicit val positionInstance: JsonFormat[org.wartremover.Position] =
+      caseClass8(org.wartremover.Position, org.wartremover.Position.unapply)(
+        "start",
+        "startLine",
+        "startColumn",
+        "end",
+        "endLine",
+        "endColumn",
+        "sourceFile",
+        "sourceCode",
+      )
+
+    implicit val diagnosticInstance: JsonFormat[org.wartremover.Diagnostic] =
+      caseClass2(org.wartremover.Diagnostic, org.wartremover.Diagnostic.unapply)(
+        "message",
+        "position",
+      )
+
+    caseClass2(InspectResult.apply, InspectResult.unapply)(
+      "errors",
+      "warnings",
+    )
+  }
+
+  private[this] implicit class JsonOps[A](private val self: A) extends AnyVal {
+    def toJsonString(implicit w: sjsonnew.JsonWriter[A]): String = {
+      val builder = new sjsonnew.Builder(sjsonnew.support.scalajson.unsafe.Converter.facade)
+      w.write(self, builder)
+      CompactPrinter.apply(
+        builder.result.getOrElse(sys.error("invalid json"))
+      )
+    }
+  }
+
+  private[this] implicit class JsonStringOps(private val string: String) extends AnyVal {
+    def decodeFromJsonString[A](implicit r: sjsonnew.JsonReader[A]): A = {
+      val json = sjsonnew.support.scalajson.unsafe.Parser.parseUnsafe(string)
+      val unbuilder = new sjsonnew.Unbuilder(sjsonnew.support.scalajson.unsafe.Converter.facade)
+      r.read(Some(json), unbuilder)
+    }
+  }
+
+  private[this] def inspectTask(x: Configuration): Def.Setting[Task[InspectResult]] = {
+    x / wartremoverInspect := Def.taskDyn {
+      val log = streams.value.log
+      val myProject = thisProjectRef.value
+      val thisTaskName = s"${myProject.project}/${x.name}/${wartremoverInspect.key.label}"
+      def skipLog(reason: String) = Def.task {
+        log.info(s"skip ${thisTaskName} because ${reason}")
+        InspectResult.empty
+      }
+      if (scalaBinaryVersion.value == "3") {
+        val errorWartNames = (x / wartremoverInspect / wartremoverErrors).value
+        val warningWartNames = (x / wartremoverInspect / wartremoverWarnings).value
+        if (errorWartNames.isEmpty && warningWartNames.isEmpty) {
+          skipLog("warts is empty")
+        } else {
+          Def.taskDyn {
+            val tastys = (x / tastyFiles).value
+            Def.taskDyn {
+              if (tastys.isEmpty) {
+                skipLog(s"${tastyFiles.key.label} is empty")
+              } else {
+                Def.taskDyn {
+                  import scala.language.reflectiveCalls
+                  val loader = (generateProject / Test / testLoader).value
+                  val clazz = loader.loadClass("org.wartremover.WartRemoverInspector")
+                  val instance = clazz
+                    .getConstructor()
+                    .newInstance()
+                    .asInstanceOf[{
+                        def run(json: String): String
+                      }
+                    ]
+
+                  val dependenciesClasspath = (x / fullClasspath).value
+                  log.info(
+                    s"running ${thisTaskName}. errorWarts = ${errorWartNames}, warningWarts = ${warningWartNames}"
+                  )
+                  val param = org.wartremover.InspectParam(
+                    tastyFiles = tastys.map(_.getAbsolutePath).toList,
+                    dependenciesClasspath = dependenciesClasspath.map(_.data.getAbsolutePath).toList,
+                    wartClasspath = {
+                      val filePrefix = "file:"
+                      (x / wartremoverClasspaths).value.map {
+                        case a if a.startsWith(filePrefix) =>
+                          file(a.drop(filePrefix.length)).getCanonicalFile.toURI.toURL
+                        case a =>
+                          new URL(a)
+                      }.map(_.toString) // TODO
+                    }.toList,
+                    errorWarts = errorWartNames.map(_.clazz).toList,
+                    warningWarts = warningWartNames.map(_.clazz).toList,
+                    failIfWartLoadError = (x / wartremoverFailIfWartLoadError).value,
+                    outputStandardReporter = (x / wartremoverInspectOutputStandardReporter).value
+                  )
+                  val result = {
+                    val json = instance.run(param.toJsonString)
+                    println(json)
+                    val r = json.decodeFromJsonString[InspectResult]
+                    new InspectResult(errors = r.errors, warnings = r.warnings) {
+                      override def toString: String = json
+                    }
+                  }
+                  if (result.errors.nonEmpty && (x / wartremoverInspectFailOnErrors).value) {
+                    sys.error(s"[${thisProjectRef.value.project}] wart error found")
+                  } else {
+                    log.info(
+                      s"finished ${thisTaskName}"
+                    )
+                    Def.task(result)
+                  }
+                }
+              }
+            }
+          }
+        }
+      } else {
+        skipLog(s"scalaVersion is ${scalaVersion.value}. not Scala 3")
+      }
+    }.value
+  }
+
   override lazy val projectSettings: Seq[Def.Setting[_]] = Def.settings(
     libraryDependencies ++= {
       Seq(
         compilerPlugin(
           "org.wartremover" %% "wartremover" % Wart.PluginVersion cross wartremoverCrossVersion.value
         )
+      )
+    },
+    Seq(Compile, Test).flatMap { x =>
+      Seq(
+        x / wartremoverFailIfWartLoadError := false,
+        x / wartremoverInspectFailOnErrors := true,
+        x / wartremoverInspectOutputStandardReporter := true,
+        inspectTask(x)
       )
     },
     scalacOptionSetting(scalacOptions),

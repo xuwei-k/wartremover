@@ -23,6 +23,18 @@ lazy val allScalaVersions = Seq(
   "3.1.2",
 )
 
+addCommandAlias(
+  "testInspectorScripted",
+  List(
+    "scalafmtAll",
+    s"++ ${latestScala3}!",
+    "all core-cross-binary/publishLocal inspector/publishLocal inspector-interface/publishLocal",
+    s"++ ${latestScala212}!",
+    "inspector-interface/publishLocal",
+    "sbt-plugin/scripted wartremover/inspector",
+  ).mkString(";")
+)
+
 def latestScala212 = latest(12, allScalaVersions)
 def latestScala213 = latest(13, allScalaVersions)
 def latestScala3 = allScalaVersions.last // TODO more better way
@@ -206,6 +218,39 @@ lazy val coreCrossBinary = Project(
   crossVersion := CrossVersion.binary
 ).dependsOn(testMacros % "test->compile")
 
+lazy val inspectorInterface = Project(
+  id = "inspector-interface",
+  base = file("inspector-interface")
+).settings(
+  commonSettings,
+  publish / skip := (scalaBinaryVersion.value == "2.13"),
+  crossScalaVersions := Seq(latestScala3, latestScala212),
+  name := "wartremover-inspector-interface",
+)
+
+lazy val inspector = Project(
+  id = "inspector",
+  base = file("inspector")
+).settings(
+  commonSettings,
+  name := "wartremover-inspector",
+  crossScalaVersions := Seq(latestScala3),
+  libraryDependencies += "io.argonaut" %% "argonaut" % "6.3.8",
+  publish / skip := (scalaBinaryVersion.value != "3"),
+  libraryDependencies ++= {
+    if (scalaBinaryVersion.value == "3") {
+      Seq(
+        "org.scala-lang" %% "scala3-tasty-inspector" % scalaVersion.value % Provided,
+      )
+    } else {
+      Nil
+    }
+  }
+).dependsOn(
+  coreCrossBinary,
+  inspectorInterface,
+)
+
 lazy val core = Project(
   id = coreId,
   base = file("core")
@@ -319,6 +364,7 @@ lazy val sbtPlug: Project = Project(
     Seq(file)
   }
 ).enablePlugins(ScriptedPlugin)
+  .dependsOn(inspectorInterface)
 
 lazy val testMacros: Project = Project(
   id = "test-macros",
