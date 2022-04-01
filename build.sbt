@@ -41,7 +41,7 @@ def latest(n: Int, versions: Seq[String]) = {
 val scalaCompilerDependency = Def.settings(
   libraryDependencies += {
     if (scalaBinaryVersion.value == "3") {
-      "org.scala-lang" %% "scala3-tasty-inspector" % scalaVersion.value
+      "org.scala-lang" %% "scala3-compiler" % scalaVersion.value
     } else {
       "org.scala-lang" % "scala-compiler" % scalaVersion.value
     }

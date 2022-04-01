@@ -1,6 +1,5 @@
-import org.wartremover.LogLevel
-import org.wartremover.WartTraverser
-import org.wartremover.WartUniverse
+package org.wartremover
+
 import scala.quoted.Quotes
 import scala.tasty.inspector.Inspector
 import scala.tasty.inspector.Tasty
@@ -53,7 +52,6 @@ class WartRemoverTastyInspector {
             override val quotes: q.type = q
           }
         val treeTraverser = traverser.apply(universe)
-        val count = tastys.size
         tastys.foreach { tasty =>
           val tree = tasty.ast
           treeTraverser.traverseTree(tree)(tree.symbol)

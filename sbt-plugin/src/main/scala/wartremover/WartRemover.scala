@@ -10,8 +10,6 @@ import sbt.librarymanagement.ivy.IvyDependencyResolution
 
 object WartRemover extends sbt.AutoPlugin {
   override def trigger = allRequirements
-  override def requires: Plugins = sbt.plugins.JvmPlugin
-
   object autoImport {
     val wartremoverInspect = taskKey[Unit]("run wartremover by TASTy inspector")
     val wartremoverErrors = settingKey[Seq[Wart]]("List of Warts that will be reported as compilation errors.")
@@ -144,7 +142,7 @@ object WartRemover extends sbt.AutoPlugin {
       val s = state.value
       val extracted = Project.extract(s)
       val loader = extracted.runTask(generateProject / Test / testLoader, s)._2
-      val clazz = loader.loadClass("WartRemoverTastyInspector")
+      val clazz = loader.loadClass("org.wartremover.WartRemoverTastyInspector")
       val instance = clazz.getConstructor().newInstance()
       val method = instance.asInstanceOf[
         {
@@ -160,7 +158,7 @@ object WartRemover extends sbt.AutoPlugin {
         (Compile / autoImport.wartremoverErrors).value,
         (Compile / autoImport.wartremoverWarnings).value,
       ).flatten
-      val log = stream.value.log
+      val log = streams.value.log
       if (warts.nonEmpty && tastys.nonEmpty) {
         method.run(
           tastyFiles = tastys.map(_.getAbsolutePath).toArray,
