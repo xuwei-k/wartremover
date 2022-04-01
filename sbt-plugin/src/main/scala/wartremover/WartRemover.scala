@@ -32,40 +32,12 @@ object WartRemover extends sbt.AutoPlugin {
     autoImport.wartremoverClasspaths := Nil
   )
 
-  final case class InspectArg(
-    tastyFiles: Seq[String],
-    dependenciesClasspath: Seq[String],
-    warts: Seq[Wart]
-  )
-
-  private[this] val runInspector = taskKey[InspectArg => Unit]("")
-
-  private[this] def generateProject = {
+  private[this] lazy val generateProject = {
     val id = "wartremover-inspector-project"
     Project(id = id, base = file("target") / id).settings(
       scalaVersion := "3.1.3-RC1-bin-20220330-ee6733a-NIGHTLY",
-      runInspector := {
-        val clazz = (Test / testLoader).value.loadClass("WartRemoverTastyInspector$")
-        (arg: InspectArg) => {
-          val instance = clazz.getConstructor().newInstance()
-          val method = instance.asInstanceOf[
-            {
-              def run(
-                tastyFiles: Array[String],
-                dependenciesClasspath: Array[String],
-                warts: Array[String]
-              ): Unit
-            }
-          ]
-          method.run(
-            tastyFiles = arg.tastyFiles.toArray,
-            dependenciesClasspath = arg.dependenciesClasspath.toArray,
-            warts = arg.warts.map(_.clazz).toArray
-          )
-        }
-      },
       libraryDependencies += {
-        "org.wartremover" %% "wartremover" % Wart.PluginVersion cross autoImport.wartremoverCrossVersion.value
+        "org.wartremover" %% "wartremover" % Wart.PluginVersion
       },
       Compile / sourceGenerators += task {
         val fileName = "WartRemoverInspector.scala"
@@ -163,13 +135,24 @@ object WartRemover extends sbt.AutoPlugin {
       )
     },
     autoImport.wartremoverInspect := {
-      val task = (generateProject / runInspector).value
-      task(
-        InspectArg(
-          tastyFiles = (Compile / tastyFiles).value.map(_.getAbsolutePath),
-          dependenciesClasspath = (Compile / fullClasspath).value.map(_.data.getAbsolutePath),
-          warts = autoImport.wartremoverErrors.value,
-        )
+      val s = state.value
+      val extracted = Project.extract(s)
+      val loader = extracted.runTask(generateProject / Test / testLoader, s)._2
+      val clazz = loader.loadClass("WartRemoverTastyInspector$")
+      val instance = clazz.getConstructor().newInstance()
+      val method = instance.asInstanceOf[
+        {
+          def run(
+            tastyFiles: Array[String],
+            dependenciesClasspath: Array[String],
+            warts: Array[String]
+          ): Unit
+        }
+      ]
+      method.run(
+        tastyFiles = (Compile / tastyFiles).value.map(_.getAbsolutePath).toArray,
+        dependenciesClasspath = (Compile / fullClasspath).value.map(_.data.getAbsolutePath).toArray,
+        warts = autoImport.wartremoverErrors.value.map(_.clazz).toArray,
       )
     },
     scalacOptionSetting(scalacOptions),
