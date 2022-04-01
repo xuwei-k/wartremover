@@ -150,19 +150,20 @@ object WartRemover extends sbt.AutoPlugin {
         x / wartremoverInspect := {
           val log = streams.value.log
           val s = state.value
-          val thisTaskName: String = s"${x.name}/${wartremoverInspect.key.label}"
+          def skipLog(reason: String) = {
+            val thisTaskName = s"${x.name}/${wartremoverInspect.key.label}"
+            log.info(s"[${name.value}] skip ${thisTaskName} because ${reason}")
+          }
           if (scalaBinaryVersion.value == "3") {
             val extracted = Project.extract(s)
             val errorWarts = (x / wartremoverInspect / wartremoverErrors).value
             val warningWarts = (x / wartremoverInspect / wartremoverWarnings).value
             if (errorWarts.isEmpty && warningWarts.isEmpty) {
-              log.info(s"skip ${thisTaskName} because warts is empty")
+              skipLog("warts is empty")
             } else {
               val tastys = extracted.runTask(x / tastyFiles, s)._2
               if (tastys.isEmpty) {
-                log.info(
-                  s"skip ${thisTaskName} because ${tastyFiles.key.label} is empty"
-                )
+                skipLog(s"${tastyFiles.key.label} is empty")
               } else {
                 import scala.language.reflectiveCalls
                 val loader = extracted.runTask(generateProject / Test / testLoader, s)._2
@@ -191,7 +192,7 @@ object WartRemover extends sbt.AutoPlugin {
               }
             }
           } else {
-            log.warn(s"skip ${thisTaskName} because scalaVersion is not Scala 3")
+            skipLog(s"scalaVersion is ${scalaVersion.value}. not Scala 3")
           }
         }
       )
