@@ -12,6 +12,7 @@ object WartRemover extends sbt.AutoPlugin {
   override def trigger = allRequirements
   object autoImport {
     val wartremoverInspect = taskKey[Unit]("run wartremover by TASTy inspector")
+    val wartremoverInspectFailOnErrors = settingKey[Boolean]("")
     val wartremoverInspectScalaVersion = settingKey[String]("scala version for wartremoverInspect task")
     val wartremoverErrors = settingKey[Seq[Wart]]("List of Warts that will be reported as compilation errors.")
     val wartremoverWarnings = settingKey[Seq[Wart]]("List of Warts that will be reported as compilation warnings.")
@@ -23,18 +24,19 @@ object WartRemover extends sbt.AutoPlugin {
     val Wart = wartremover.Wart
     val Warts = wartremover.Warts
   }
+  import autoImport.*
 
   override def globalSettings = Seq(
-    autoImport.wartremoverInspectScalaVersion := {
+    wartremoverInspectScalaVersion := {
       // need NIGHTLY version because there are some bugs in old tasty-inspector.
       "3.1.3-RC1-bin-20220330-ee6733a-NIGHTLY",
     },
-    autoImport.wartremoverCrossVersion := CrossVersion.full,
-    autoImport.wartremoverDependencies := Nil,
-    autoImport.wartremoverErrors := Nil,
-    autoImport.wartremoverWarnings := Nil,
-    autoImport.wartremoverExcluded := Nil,
-    autoImport.wartremoverClasspaths := Nil
+    wartremoverCrossVersion := CrossVersion.full,
+    wartremoverDependencies := Nil,
+    wartremoverErrors := Nil,
+    wartremoverWarnings := Nil,
+    wartremoverExcluded := Nil,
+    wartremoverClasspaths := Nil
   )
 
   private[this] lazy val generateProject = {
@@ -43,11 +45,11 @@ object WartRemover extends sbt.AutoPlugin {
       run / fork := true,
       fork := true,
       autoScalaLibrary := false,
-      scalaVersion := autoImport.wartremoverInspectScalaVersion.value,
+      scalaVersion := wartremoverInspectScalaVersion.value,
       libraryDependencies := {
         if (scalaBinaryVersion.value == "3") {
           Seq(
-            "org.scala-lang" % "scala3-tasty-inspector_3" % autoImport.wartremoverInspectScalaVersion.value,
+            "org.scala-lang" % "scala3-tasty-inspector_3" % wartremoverInspectScalaVersion.value,
             "org.wartremover" % "wartremover_3" % Wart.PluginVersion,
           )
         } else {
@@ -108,7 +110,7 @@ object WartRemover extends sbt.AutoPlugin {
           val originalPluginFile = file(opt.drop(prefix.length))
           copyToCompilerPluginJarsDir(
             src = originalPluginFile,
-            jarDir = autoImport.wartremoverPluginJarsDir.value,
+            jarDir = wartremoverPluginJarsDir.value,
             base = (LocalRootProject / baseDirectory).value,
             log = streams.value.log
           ).map {
@@ -122,11 +124,11 @@ object WartRemover extends sbt.AutoPlugin {
   }
 
   def dependsOnLocalProjectWarts(p: Reference, configuration: Configuration = Compile): Def.SettingsDefinition = {
-    autoImport.wartremoverClasspaths ++= {
+    wartremoverClasspaths ++= {
       (p / configuration / fullClasspath).value.map(_.data).map { f =>
         copyToCompilerPluginJarsDir(
           src = f,
-          jarDir = autoImport.wartremoverPluginJarsDir.value,
+          jarDir = wartremoverPluginJarsDir.value,
           base = (LocalRootProject / baseDirectory).value,
           log = streams.value.log
         ).map("file:" + _).getOrElse(f.toURI.toString)
@@ -138,54 +140,61 @@ object WartRemover extends sbt.AutoPlugin {
     libraryDependencies ++= {
       Seq(
         compilerPlugin(
-          "org.wartremover" %% "wartremover" % Wart.PluginVersion cross autoImport.wartremoverCrossVersion.value
+          "org.wartremover" %% "wartremover" % Wart.PluginVersion cross wartremoverCrossVersion.value
         )
       )
     },
     Seq(Compile, Test).flatMap { x =>
-      (x / autoImport.wartremoverInspect) := {
-        val log = streams.value.log
-        val s = state.value
-        if (scalaBinaryVersion.value == "3") {
-          val extracted = Project.extract(s)
-          val errorWarts = (x / compile / autoImport.wartremoverErrors).value
-          val warningWarts = (x / compile / autoImport.wartremoverWarnings).value
-          if (errorWarts.isEmpty && warningWarts.isEmpty) {
-            log.info(s"skip ${x.name}/${autoImport.wartremoverInspect.key.label} because warts is empty")
-          } else {
-            val tastys = extracted.runTask(x / tastyFiles, s)._2
-            if (tastys.nonEmpty) {
-              log.info(
-                s"skip ${x.name}/${autoImport.wartremoverInspect.key.label} because ${tastyFiles.key.label} is empty"
-              )
+      Seq(
+        x / wartremoverInspectFailOnErrors := true,
+        x / wartremoverInspect := {
+          val log = streams.value.log
+          val s = state.value
+          val thisTaskName: String = s"${x.name}/${wartremoverInspect.key.label}"
+          if (scalaBinaryVersion.value == "3") {
+            val extracted = Project.extract(s)
+            val errorWarts = (x / wartremoverInspect / wartremoverErrors).value
+            val warningWarts = (x / wartremoverInspect / wartremoverWarnings).value
+            if (errorWarts.isEmpty && warningWarts.isEmpty) {
+              log.info(s"skip ${thisTaskName} because warts is empty")
             } else {
-              import scala.language.reflectiveCalls
-              val loader = extracted.runTask(generateProject / Test / testLoader, s)._2
-              val clazz = loader.loadClass("org.wartremover.WartRemoverTastyInspector")
-              val instance = clazz.getConstructor().newInstance()
-              val method = instance.asInstanceOf[
-                {
-                  def run(
-                    tastyFiles: Array[String],
-                    dependenciesClasspath: Array[String],
-                    errorWarts: Array[String],
-                    warningWarts: Array[String]
-                  ): Unit
-                }
-              ]
+              val tastys = extracted.runTask(x / tastyFiles, s)._2
+              if (tastys.isEmpty) {
+                log.info(
+                  s"skip ${thisTaskName} because ${tastyFiles.key.label} is empty"
+                )
+              } else {
+                import scala.language.reflectiveCalls
+                val loader = extracted.runTask(generateProject / Test / testLoader, s)._2
+                val clazz = loader.loadClass("org.wartremover.WartRemoverTastyInspector")
+                val instance = clazz.getConstructor().newInstance()
+                val method = instance.asInstanceOf[
+                  {
+                    def run(
+                      tastyFiles: Array[String],
+                      dependenciesClasspath: Array[String],
+                      errorWarts: Array[String],
+                      warningWarts: Array[String]
+                    ): Int
+                  }
+                ]
 
-              method.run(
-                tastyFiles = tastys.map(_.getAbsolutePath).toArray,
-                dependenciesClasspath = (Compile / fullClasspath).value.map(_.data.getAbsolutePath).toArray,
-                errorWarts = errorWarts.map(_.clazz).toArray,
-                warningWarts = warningWarts.map(_.clazz).toArray
-              )
+                val errorCount = method.run(
+                  tastyFiles = tastys.map(_.getAbsolutePath).toArray,
+                  dependenciesClasspath = (x / fullClasspath).value.map(_.data.getAbsolutePath).toArray,
+                  errorWarts = errorWarts.map(_.clazz).toArray,
+                  warningWarts = warningWarts.map(_.clazz).toArray
+                )
+                if (errorCount != 0 && (x / wartremoverInspectFailOnErrors).value) {
+                  sys.error("wart error found")
+                }
+              }
             }
+          } else {
+            log.warn(s"skip ${thisTaskName} because scalaVersion is not Scala 3")
           }
-        } else {
-          log.warn("current scala version is not Scala 3")
         }
-      }
+      )
     },
     scalacOptionSetting(scalacOptions),
     scalacOptionSetting(Compile / scalacOptions),
@@ -193,13 +202,13 @@ object WartRemover extends sbt.AutoPlugin {
     scalacOptions ++= {
       // use relative path
       // https://github.com/sbt/sbt/issues/6027
-      autoImport.wartremoverExcluded.value.distinct.map { c =>
+      wartremoverExcluded.value.distinct.map { c =>
         val base = (LocalRootProject / baseDirectory).value
         val x = base.toPath.relativize(c.toPath)
         s"-P:wartremover:excluded:$x"
       }
     },
-    autoImport.wartremoverPluginJarsDir := {
+    wartremoverPluginJarsDir := {
       if (VersionNumber(sbtVersion.value).matchesSemVer(SemanticSelector(">=1.4.0"))) {
         Some((LocalRootProject / target).value / "compiler_plugins")
       } else {
@@ -208,10 +217,10 @@ object WartRemover extends sbt.AutoPlugin {
     },
     inScope(Scope.ThisScope)(
       Seq(
-        autoImport.wartremoverClasspaths ++= {
+        wartremoverClasspaths ++= {
           val ivy = ivySbt.value
           val s = streams.value
-          autoImport.wartremoverDependencies.value.map { m =>
+          wartremoverDependencies.value.map { m =>
             val moduleId = CrossVersion(
               cross = m.crossVersion,
               fullVersion = scalaVersion.value,
@@ -225,7 +234,7 @@ object WartRemover extends sbt.AutoPlugin {
             val a = getArtifact(moduleId, ivy, s)
             copyToCompilerPluginJarsDir(
               src = a,
-              jarDir = autoImport.wartremoverPluginJarsDir.value,
+              jarDir = wartremoverPluginJarsDir.value,
               base = (LocalRootProject / baseDirectory).value,
               log = streams.value.log
             ).map("file:" + _).getOrElse(a.toURI.toString)
@@ -233,19 +242,19 @@ object WartRemover extends sbt.AutoPlugin {
         },
         derive(
           scalacOptions ++= {
-            autoImport.wartremoverErrors.value.distinct map (w => s"-P:wartremover:traverser:${w.clazz}")
+            wartremoverErrors.value.distinct map (w => s"-P:wartremover:traverser:${w.clazz}")
           }
         ),
         derive(
           scalacOptions ++= {
-            autoImport.wartremoverWarnings.value.distinct filterNot (autoImport.wartremoverErrors.value contains _) map (
-              w => s"-P:wartremover:only-warn-traverser:${w.clazz}"
+            wartremoverWarnings.value.distinct filterNot (wartremoverErrors.value contains _) map (w =>
+              s"-P:wartremover:only-warn-traverser:${w.clazz}"
             )
           }
         ),
         derive(
           scalacOptions ++= {
-            autoImport.wartremoverClasspaths.value.distinct map (cp => s"-P:wartremover:cp:$cp")
+            wartremoverClasspaths.value.distinct map (cp => s"-P:wartremover:cp:$cp")
           }
         )
       )

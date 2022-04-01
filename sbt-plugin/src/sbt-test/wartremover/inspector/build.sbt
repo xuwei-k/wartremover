@@ -1,6 +1,6 @@
 val root = project.in(file("."))
 
-wartremoverWarnings ++= Warts.all
+Compile / wartremoverInspect / wartremoverWarnings ++= Warts.all
 
 scalaVersion := "3.1.1"
 

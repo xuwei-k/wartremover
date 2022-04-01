@@ -1,10 +1,11 @@
 package org.wartremover
 
+import java.util.concurrent.atomic.AtomicInteger
 import scala.quoted.Quotes
+import scala.reflect.NameTransformer
 import scala.tasty.inspector.Inspector
 import scala.tasty.inspector.Tasty
 import scala.tasty.inspector.TastyInspector
-import scala.reflect.NameTransformer
 import scala.util.control.NonFatal
 
 class WartRemoverTastyInspector {
@@ -17,14 +18,16 @@ class WartRemoverTastyInspector {
     dependenciesClasspath: Array[String],
     errorWarts: Array[String],
     warningWarts: Array[String],
-  ): Unit = {
+  ): Int = {
     if (tastyFiles.isEmpty) {
       println("tastyFiles is empty")
+      0
     } else {
       val errorTraversers = errorWarts.flatMap(load).toList
       val warningTraversers = warningWarts.flatMap(load).toList
       if (errorTraversers.isEmpty && warningWarts.isEmpty) {
         println("warts is empty")
+        0
       } else {
         runImpl(
           errorTraversers = errorTraversers,
@@ -54,15 +57,20 @@ class WartRemoverTastyInspector {
     warningTraversers: List[WartTraverser],
     tastyFiles: List[String],
     dependenciesClasspath: List[String],
-  ): Unit = {
+  ): Int = {
+    val errorCount = new AtomicInteger()
     val inspector = new Inspector {
       def inspect(using q: Quotes)(tastys: List[Tasty[q.type]]): Unit = {
         import q.reflect.*
         def run(onlyWarning: Boolean, traverser: WartTraverser) = {
           val universe: WartUniverse.Aux[q.type] =
-            new WartUniverse(onlyWarning = false, logLevel = LogLevel.Debug) {
+            new WartUniverse(onlyWarning = onlyWarning, logLevel = LogLevel.Debug) {
               override type Q = q.type
               override val quotes: q.type = q
+              override def onError(msg: String, pos: Position): Unit = {
+                super.onError(msg = msg, pos = pos)
+                errorCount.incrementAndGet
+              }
             }
 
           val treeTraverser = traverser.apply(universe)
@@ -81,5 +89,7 @@ class WartRemoverTastyInspector {
       jars = Nil,
       dependenciesClasspath = dependenciesClasspath,
     )(inspector)
+
+    errorCount.get
   }
 }
