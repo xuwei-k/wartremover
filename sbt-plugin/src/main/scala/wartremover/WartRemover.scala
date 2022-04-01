@@ -12,7 +12,7 @@ object WartRemover extends sbt.AutoPlugin {
   override def trigger = allRequirements
   object autoImport {
     val wartremoverInspect = taskKey[Unit]("run wartremover by TASTy inspector")
-    val wartremoverInspectScalaVersion = settingKey[String]("")
+    val wartremoverInspectScalaVersion = settingKey[String]("scala version for wartremoverInspect task")
     val wartremoverErrors = settingKey[Seq[Wart]]("List of Warts that will be reported as compilation errors.")
     val wartremoverWarnings = settingKey[Seq[Wart]]("List of Warts that will be reported as compilation warnings.")
     val wartremoverExcluded = taskKey[Seq[File]]("List of files to be excluded from all checks.")
@@ -25,7 +25,10 @@ object WartRemover extends sbt.AutoPlugin {
   }
 
   override def globalSettings = Seq(
-    autoImport.wartremoverInspectScalaVersion := "3.1.3-RC1-bin-20220330-ee6733a-NIGHTLY",
+    autoImport.wartremoverInspectScalaVersion := {
+      // need NIGHTLY version because there are some bugs in old tasty-inspector.
+      "3.1.3-RC1-bin-20220330-ee6733a-NIGHTLY",
+    },
     autoImport.wartremoverCrossVersion := CrossVersion.full,
     autoImport.wartremoverDependencies := Nil,
     autoImport.wartremoverErrors := Nil,
@@ -37,25 +40,20 @@ object WartRemover extends sbt.AutoPlugin {
   private[this] lazy val generateProject = {
     val id = "wartremover-inspector-project"
     Project(id = id, base = file("target") / id).settings(
-      scalaVersion := autoImport.wartremoverInspectScalaVersion.value,
       run / fork := true,
       fork := true,
-      libraryDependencies ++= Seq(
-        "org.scala-lang" %% "scala3-tasty-inspector" % autoImport.wartremoverInspectScalaVersion.value,
-        "org.wartremover" %% "wartremover" % Wart.PluginVersion
-      ),
-      Compile / sourceGenerators += task {
+      autoScalaLibrary := false,
+      scalaVersion := autoImport.wartremoverInspectScalaVersion.value,
+      libraryDependencies := {
         if (scalaBinaryVersion.value == "3") {
-          val fileName = "WartRemoverInspector.scala"
-          val input = WartRemover.getClass.getResourceAsStream("/" + fileName)
-          val src = scala.io.Source.fromInputStream(input).getLines().mkString("\n")
-          val f = (Compile / resourceManaged).value / fileName
-          IO.write(f, src)
-          Seq(f)
+          Seq(
+            "org.scala-lang" % "scala3-tasty-inspector_3" % autoImport.wartremoverInspectScalaVersion.value,
+            "org.wartremover" % "wartremover_3" % Wart.PluginVersion,
+          )
         } else {
           Nil
         }
-      },
+      }
     )
   }
 
@@ -145,36 +143,46 @@ object WartRemover extends sbt.AutoPlugin {
       )
     },
     autoImport.wartremoverInspect := {
-      val s = state.value
-      val extracted = Project.extract(s)
-      val loader = extracted.runTask(generateProject / Test / testLoader, s)._2
-      val clazz = loader.loadClass("org.wartremover.WartRemoverTastyInspector")
-      val instance = clazz.getConstructor().newInstance()
-      val method = instance.asInstanceOf[
-        {
-          def run(
-            tastyFiles: Array[String],
-            dependenciesClasspath: Array[String],
-            warts: Array[String]
-          ): Unit
-        }
-      ]
-      val tastys = (Compile / tastyFiles).value
-      val warts = Seq(
-        (Compile / compile / autoImport.wartremoverErrors).value,
-        (Compile / compile / autoImport.wartremoverWarnings).value,
-        (Test / compile / autoImport.wartremoverErrors).value,
-        (Test / compile / autoImport.wartremoverWarnings).value,
-      ).flatten
       val log = streams.value.log
-      if (warts.nonEmpty && tastys.nonEmpty) {
-        method.run(
-          tastyFiles = tastys.map(_.getAbsolutePath).toArray,
-          dependenciesClasspath = (Compile / fullClasspath).value.map(_.data.getAbsolutePath).toArray,
-          warts = warts.map(_.clazz).toArray,
-        )
+      val s = state.value
+      if (scalaBinaryVersion.value == "3") {
+        val extracted = Project.extract(s)
+
+        val warts = Seq(
+          (Compile / compile / autoImport.wartremoverErrors).value,
+          (Compile / compile / autoImport.wartremoverWarnings).value,
+          (Test / compile / autoImport.wartremoverErrors).value,
+          (Test / compile / autoImport.wartremoverWarnings).value,
+        ).flatten
+        if (warts.isEmpty) {
+          log.info(s"skip ${autoImport.wartremoverInspect.key.label} because warts is empty")
+        } else {
+          val tastys = extracted.runTask(Compile / tastyFiles, s)._2
+          if (tastys.nonEmpty) {
+            log.info(s"skip ${autoImport.wartremoverInspect.key.label} because ${tastyFiles.key.label} is empty")
+          } else {
+            val loader = extracted.runTask(generateProject / Test / testLoader, s)._2
+            val clazz = loader.loadClass("org.wartremover.WartRemoverTastyInspector")
+            val instance = clazz.getConstructor().newInstance()
+            val method = instance.asInstanceOf[
+              {
+                def run(
+                  tastyFiles: Array[String],
+                  dependenciesClasspath: Array[String],
+                  warts: Array[String]
+                ): Unit
+              }
+            ]
+
+            method.run(
+              tastyFiles = tastys.map(_.getAbsolutePath).toArray,
+              dependenciesClasspath = (Compile / fullClasspath).value.map(_.data.getAbsolutePath).toArray,
+              warts = warts.map(_.clazz).toArray,
+            )
+          }
+        }
       } else {
-        log.warn("warts or tastys empty")
+        log.warn("current scala version is not Scala 3")
       }
     },
     scalacOptionSetting(scalacOptions),

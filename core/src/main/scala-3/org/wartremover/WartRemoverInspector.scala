@@ -16,11 +16,11 @@ class WartRemoverTastyInspector {
   ): Unit = {
     if (tastyFiles.isEmpty) {
       println("tastyFiles is empty")
-    } else if(warts.isEmpty) {
+    } else if (warts.isEmpty) {
       println("warts is empty")
     } else {
       runImpl(
-        traverser = warts.flatMap{ name => 
+        traverser = warts.flatMap { name =>
           try {
             val clazz = Class.forName(name + NameTransformer.MODULE_SUFFIX_STRING)
             val field = clazz.getField(NameTransformer.MODULE_INSTANCE_NAME)
