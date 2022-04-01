@@ -1,5 +1,6 @@
 package org.wartremover
 
+import java.net.URLClassLoader
 import java.util.concurrent.atomic.AtomicInteger
 import scala.quoted.Quotes
 import scala.reflect.NameTransformer
@@ -7,6 +8,7 @@ import scala.tasty.inspector.Inspector
 import scala.tasty.inspector.Tasty
 import scala.tasty.inspector.TastyInspector
 import scala.util.control.NonFatal
+import java.net.URL
 
 class WartRemoverTastyInspector {
 
@@ -16,15 +18,20 @@ class WartRemoverTastyInspector {
   def run(
     tastyFiles: Array[String],
     dependenciesClasspath: Array[String],
+    wartClasspath: Array[URL],
     errorWarts: Array[String],
     warningWarts: Array[String],
   ): Int = {
+    println("dependenciesClasspath = " + dependenciesClasspath.toList)
+    println("wartClasspath = " + wartClasspath.toList)
     if (tastyFiles.isEmpty) {
       println("tastyFiles is empty")
       0
     } else {
-      val errorTraversers = errorWarts.flatMap(load).toList
-      val warningTraversers = warningWarts.flatMap(load).toList
+      val classLoader = new URLClassLoader(wartClasspath, getClass.getClassLoader)
+      val (errorLoadFail, errorTraversers) = errorWarts.toList.partitionMap(Plugin.loadWart(_, classLoader))
+      val (warnLoadFail, warningTraversers) = warningWarts.toList.partitionMap(Plugin.loadWart(_, classLoader))
+      println("load fail warts = " + (errorLoadFail ++ warnLoadFail).map(_._1).mkString(", "))
       if (errorTraversers.isEmpty && warningWarts.isEmpty) {
         println("warts is empty")
         0
@@ -36,19 +43,6 @@ class WartRemoverTastyInspector {
           dependenciesClasspath = dependenciesClasspath.toList,
         )
       }
-    }
-  }
-
-  private[this] def load(name: String): Option[WartTraverser] = {
-    try {
-      val clazz = Class.forName(name + NameTransformer.MODULE_SUFFIX_STRING)
-      val field = clazz.getField(NameTransformer.MODULE_INSTANCE_NAME)
-      val instance = field.get(null)
-      Some(instance.asInstanceOf[WartTraverser])
-    } catch {
-      case NonFatal(e) =>
-        println(s"failed load warts $name $e")
-        None
     }
   }
 

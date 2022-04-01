@@ -1,6 +1,7 @@
 package wartremover
 
 import java.nio.file.Path
+import java.net.URL
 import sbt._
 import sbt.Keys._
 import sbt.internal.librarymanagement.IvySbt
@@ -175,6 +176,7 @@ object WartRemover extends sbt.AutoPlugin {
                     def run(
                       tastyFiles: Array[String],
                       dependenciesClasspath: Array[String],
+                      wartClasspath: Array[URL],
                       errorWarts: Array[String],
                       warningWarts: Array[String]
                     ): Int
@@ -186,6 +188,18 @@ object WartRemover extends sbt.AutoPlugin {
                 val errorCount = method.run(
                   tastyFiles = tastys.map(_.getAbsolutePath).toArray,
                   dependenciesClasspath = (x / fullClasspath).value.map(_.data.getAbsolutePath).toArray,
+                  wartClasspath = {
+                    extracted
+                      .runTask(myProject / x / wartremoverClasspaths, s)
+                      ._2
+                      .map {
+                        case a if a.startsWith("file:") =>
+                          file(a.drop("file:".length)).getCanonicalFile.toURI.toURL
+                        case a =>
+                          new URL(a)
+                      }
+                      .toArray
+                  },
                   errorWarts = errorWarts.map(_.clazz).toArray,
                   warningWarts = warningWarts.map(_.clazz).toArray
                 )
