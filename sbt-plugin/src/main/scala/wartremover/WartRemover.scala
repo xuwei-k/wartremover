@@ -150,18 +150,19 @@ object WartRemover extends sbt.AutoPlugin {
         x / wartremoverInspect := {
           val log = streams.value.log
           val s = state.value
+          val extracted = Project.extract(s)
+          val myProject = thisProjectRef.value
           def skipLog(reason: String) = {
-            val thisTaskName = s"${x.name}/${wartremoverInspect.key.label}"
-            log.info(s"[${name.value}] skip ${thisTaskName} because ${reason}")
+            val thisTaskName = s"${myProject.project}/${x.name}/${wartremoverInspect.key.label}"
+            log.info(s"skip ${thisTaskName} because ${reason}")
           }
           if (scalaBinaryVersion.value == "3") {
-            val extracted = Project.extract(s)
             val errorWarts = (x / wartremoverInspect / wartremoverErrors).value
             val warningWarts = (x / wartremoverInspect / wartremoverWarnings).value
             if (errorWarts.isEmpty && warningWarts.isEmpty) {
               skipLog("warts is empty")
             } else {
-              val tastys = extracted.runTask(x / tastyFiles, s)._2
+              val tastys = extracted.runTask(myProject / x / tastyFiles, s)._2
               if (tastys.isEmpty) {
                 skipLog(s"${tastyFiles.key.label} is empty")
               } else {
@@ -179,7 +180,9 @@ object WartRemover extends sbt.AutoPlugin {
                     ): Int
                   }
                 ]
-
+                log.info(
+                  s"running ${myProject.project}/${x.name}/${wartremoverInspect.key.label}. errorWarts = ${errorWarts}, warningWarts = ${warningWarts}"
+                )
                 val errorCount = method.run(
                   tastyFiles = tastys.map(_.getAbsolutePath).toArray,
                   dependenciesClasspath = (x / fullClasspath).value.map(_.data.getAbsolutePath).toArray,
@@ -187,7 +190,11 @@ object WartRemover extends sbt.AutoPlugin {
                   warningWarts = warningWarts.map(_.clazz).toArray
                 )
                 if (errorCount != 0 && (x / wartremoverInspectFailOnErrors).value) {
-                  sys.error("wart error found")
+                  sys.error("[${myProject.project}] wart error found")
+                } else {
+                  log.info(
+                    s"finished ${myProject.project}/${x.name}/${wartremoverInspect.key.label}"
+                  )
                 }
               }
             }
