@@ -10,6 +10,8 @@ import sbt.librarymanagement.ivy.IvyDependencyResolution
 
 object WartRemover extends sbt.AutoPlugin {
   override def trigger = allRequirements
+  override def requires: Plugins = sbt.plugins.JvmPlugin
+
   object autoImport {
     val wartremoverInspect = taskKey[Unit]("run wartremover by TASTy inspector")
     val wartremoverErrors = settingKey[Seq[Wart]]("List of Warts that will be reported as compilation errors.")
@@ -36,9 +38,12 @@ object WartRemover extends sbt.AutoPlugin {
     val id = "wartremover-inspector-project"
     Project(id = id, base = file("target") / id).settings(
       scalaVersion := "3.1.3-RC1-bin-20220330-ee6733a-NIGHTLY",
-      libraryDependencies += {
+      run / fork := true,
+      fork := true,
+      libraryDependencies ++= Seq(
+        "org.scala-lang" %% "scala3-tasty-inspector" % scalaVersion.value,
         "org.wartremover" %% "wartremover" % Wart.PluginVersion
-      },
+      ),
       Compile / sourceGenerators += task {
         val fileName = "WartRemoverInspector.scala"
         val input = WartRemover.getClass.getResourceAsStream("/" + fileName)
@@ -52,10 +57,11 @@ object WartRemover extends sbt.AutoPlugin {
 
   // avoid extraProjects https://github.com/sbt/sbt/issues/4947
   override def derivedProjects(proj: ProjectDefinition[?]): Seq[Project] = {
-    if (proj.projectOrigin == ProjectOrigin.Organic) {
-      Seq(generateProject)
-    } else {
-      Nil
+    proj.projectOrigin match {
+      case ProjectOrigin.DerivedProject =>
+        Nil
+      case _ =>
+        Seq(generateProject)
     }
   }
 
@@ -138,7 +144,7 @@ object WartRemover extends sbt.AutoPlugin {
       val s = state.value
       val extracted = Project.extract(s)
       val loader = extracted.runTask(generateProject / Test / testLoader, s)._2
-      val clazz = loader.loadClass("WartRemoverTastyInspector$")
+      val clazz = loader.loadClass("WartRemoverTastyInspector")
       val instance = clazz.getConstructor().newInstance()
       val method = instance.asInstanceOf[
         {
@@ -149,11 +155,21 @@ object WartRemover extends sbt.AutoPlugin {
           ): Unit
         }
       ]
-      method.run(
-        tastyFiles = (Compile / tastyFiles).value.map(_.getAbsolutePath).toArray,
-        dependenciesClasspath = (Compile / fullClasspath).value.map(_.data.getAbsolutePath).toArray,
-        warts = autoImport.wartremoverErrors.value.map(_.clazz).toArray,
-      )
+      val tastys = (Compile / tastyFiles).value
+      val warts = Seq(
+        (Compile / autoImport.wartremoverErrors).value,
+        (Compile / autoImport.wartremoverWarnings).value,
+      ).flatten
+      val log = stream.value.log
+      if (warts.nonEmpty && tastys.nonEmpty) {
+        method.run(
+          tastyFiles = tastys.map(_.getAbsolutePath).toArray,
+          dependenciesClasspath = (Compile / fullClasspath).value.map(_.data.getAbsolutePath).toArray,
+          warts = warts.map(_.clazz).toArray,
+        )
+      } else {
+        log.warn("warts or tastys empty")
+      }
     },
     scalacOptionSetting(scalacOptions),
     scalacOptionSetting(Compile / scalacOptions),
