@@ -50,7 +50,7 @@ object WartRemover extends sbt.AutoPlugin {
         if (scalaBinaryVersion.value == "3") {
           Seq(
             "org.scala-lang" % "scala3-tasty-inspector_3" % wartremoverInspectScalaVersion.value,
-            "org.wartremover" % "wartremover_3" % Wart.PluginVersion,
+            "org.wartremover" % "wartremover-inspector_3" % Wart.PluginVersion,
           )
         } else {
           Nil

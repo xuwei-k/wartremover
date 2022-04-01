@@ -39,16 +39,11 @@ def latest(n: Int, versions: Seq[String]) = {
 }
 
 val scalaCompilerDependency = Def.settings(
-  libraryDependencies ++= {
+  libraryDependencies += {
     if (scalaBinaryVersion.value == "3") {
-      Seq(
-        "org.scala-lang" %% "scala3-tasty-inspector" % scalaVersion.value % Provided,
-        "org.scala-lang" %% "scala3-compiler" % scalaVersion.value,
-      )
+      "org.scala-lang" %% "scala3-compiler" % scalaVersion.value
     } else {
-      Seq(
-        "org.scala-lang" % "scala-compiler" % scalaVersion.value,
-      )
+      "org.scala-lang" % "scala-compiler" % scalaVersion.value
     }
   },
 )
@@ -202,6 +197,25 @@ lazy val coreCrossBinary = Project(
   crossScalaVersions := Seq(latestScala212, latestScala213, latestScala3),
   crossVersion := CrossVersion.binary
 ).dependsOn(testMacros % "test->compile")
+
+lazy val inspector = Project(
+  id = "inspector",
+  base = file("inspector")
+).settings(
+  commonSettings,
+  name := "wartremover-inspector",
+  crossScalaVersions := Seq(latestScala3),
+  publish / skip := (scalaBinaryVersion.value != "3"),
+  libraryDependencies ++= {
+    if (scalaBinaryVersion.value == "3") {
+      Seq(
+        "org.scala-lang" %% "scala3-tasty-inspector" % scalaVersion.value % Provided,
+      )
+    } else {
+      Nil
+    }
+  }
+).dependsOn(coreCrossBinary)
 
 lazy val core = Project(
   id = coreId,
