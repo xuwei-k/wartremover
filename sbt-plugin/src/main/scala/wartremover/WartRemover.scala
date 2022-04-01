@@ -190,7 +190,7 @@ object WartRemover extends sbt.AutoPlugin {
                   warningWarts = warningWarts.map(_.clazz).toArray
                 )
                 if (errorCount != 0 && (x / wartremoverInspectFailOnErrors).value) {
-                  sys.error("[${myProject.project}] wart error found")
+                  sys.error(s"[${myProject.project}] wart error found")
                 } else {
                   log.info(
                     s"finished ${myProject.project}/${x.name}/${wartremoverInspect.key.label}"
