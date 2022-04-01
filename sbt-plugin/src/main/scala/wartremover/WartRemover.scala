@@ -12,6 +12,7 @@ object WartRemover extends sbt.AutoPlugin {
   override def trigger = allRequirements
   object autoImport {
     val wartremoverInspect = taskKey[Unit]("run wartremover by TASTy inspector")
+    val wartremoverInspectScalaVersion = settingKey[String]("")
     val wartremoverErrors = settingKey[Seq[Wart]]("List of Warts that will be reported as compilation errors.")
     val wartremoverWarnings = settingKey[Seq[Wart]]("List of Warts that will be reported as compilation warnings.")
     val wartremoverExcluded = taskKey[Seq[File]]("List of files to be excluded from all checks.")
@@ -24,6 +25,7 @@ object WartRemover extends sbt.AutoPlugin {
   }
 
   override def globalSettings = Seq(
+    autoImport.wartremoverInspectScalaVersion := "3.1.3-RC1-bin-20220330-ee6733a-NIGHTLY",
     autoImport.wartremoverCrossVersion := CrossVersion.full,
     autoImport.wartremoverDependencies := Nil,
     autoImport.wartremoverErrors := Nil,
@@ -35,20 +37,24 @@ object WartRemover extends sbt.AutoPlugin {
   private[this] lazy val generateProject = {
     val id = "wartremover-inspector-project"
     Project(id = id, base = file("target") / id).settings(
-      scalaVersion := "3.1.3-RC1-bin-20220330-ee6733a-NIGHTLY",
+      scalaVersion := autoImport.wartremoverInspectScalaVersion.value,
       run / fork := true,
       fork := true,
       libraryDependencies ++= Seq(
-        "org.scala-lang" %% "scala3-tasty-inspector" % scalaVersion.value,
+        "org.scala-lang" %% "scala3-tasty-inspector" % autoImport.wartremoverInspectScalaVersion.value,
         "org.wartremover" %% "wartremover" % Wart.PluginVersion
       ),
       Compile / sourceGenerators += task {
-        val fileName = "WartRemoverInspector.scala"
-        val input = WartRemover.getClass.getResourceAsStream("/" + fileName)
-        val src = scala.io.Source.fromInputStream(input).getLines().mkString("\n")
-        val f = (Compile / resourceManaged).value / fileName
-        IO.write(f, src)
-        Seq(f)
+        if (scalaBinaryVersion.value == "3") {
+          val fileName = "WartRemoverInspector.scala"
+          val input = WartRemover.getClass.getResourceAsStream("/" + fileName)
+          val src = scala.io.Source.fromInputStream(input).getLines().mkString("\n")
+          val f = (Compile / resourceManaged).value / fileName
+          IO.write(f, src)
+          Seq(f)
+        } else {
+          Nil
+        }
       },
     )
   }
@@ -155,8 +161,10 @@ object WartRemover extends sbt.AutoPlugin {
       ]
       val tastys = (Compile / tastyFiles).value
       val warts = Seq(
-        (Compile / autoImport.wartremoverErrors).value,
-        (Compile / autoImport.wartremoverWarnings).value,
+        (Compile / compile / autoImport.wartremoverErrors).value,
+        (Compile / compile / autoImport.wartremoverWarnings).value,
+        (Test / compile / autoImport.wartremoverErrors).value,
+        (Test / compile / autoImport.wartremoverWarnings).value,
       ).flatten
       val log = streams.value.log
       if (warts.nonEmpty && tastys.nonEmpty) {
