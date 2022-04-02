@@ -7,4 +7,5 @@ final case class InspectParam(
   errorWarts: List[String],
   warningWarts: List[String],
   failIfWartLoadError: Boolean,
+  outputStandardReporter: Boolean,
 )
