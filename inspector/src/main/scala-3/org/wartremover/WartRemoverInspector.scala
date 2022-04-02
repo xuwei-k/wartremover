@@ -15,78 +15,37 @@ import scala.util.control.NonFatal
 import java.net.URL
 
 object WartRemoverInspector {
-  private final case class WartInspectResult(
-    errors: Array[WartDiagnostic],
-    warnings: Array[WartDiagnostic],
-  ) extends InspectResult
-
-  private final case class WartDiagnosticImpl(
-    message: String,
-    position: Position
-  ) extends WartDiagnostic
-
-  private final case class SourcePos(
-    override val start: Int,
-    override val startLine: Int,
-    override val startColumn: Int,
-    override val end: Int,
-    override val endLine: Int,
-    override val endColumn: Int,
-    override val sourceFile: SourceFile,
-    sourceCodeOpt: Option[String],
-  ) extends Position {
-    override def sourceCode: Optional[String] = sourceCodeOpt.toJava
-  }
-
-  private final case class SrcFile(
-    pathOpt: Option[Path],
-    override val name: String,
-    override val path: String,
-    contentOpt: Option[String],
-  ) extends SourceFile {
-    override def content: Optional[String] = contentOpt.toJava
-    override def getJPath: Optional[Path] = pathOpt.toJava
-  }
 }
 
 class WartRemoverInspector extends WartInspector {
 
   override def run(param: InspectParam): InspectResult = {
-    hoge(
-      tastyFiles = param.tastyFiles,
-      dependenciesClasspath = param.dependenciesClasspath,
-      wartClasspath = param.wartClasspath,
-      errorWarts = param.errorWarts,
-      warningWarts = param.warningWarts
-    )
-  }
-
-  def hoge(
-    tastyFiles: Array[String],
-    dependenciesClasspath: Array[String],
-    wartClasspath: Array[URL],
-    errorWarts: Array[String],
-    warningWarts: Array[String],
-  ): InspectResult = {
-    println("dependenciesClasspath = " + dependenciesClasspath.toList)
-    println("wartClasspath = " + wartClasspath.toList)
-    if (tastyFiles.isEmpty) {
+    println("dependenciesClasspath = " + param.dependenciesClasspath.toList)
+    println("wartClasspath = " + param.wartClasspath.toList)
+    if (param.tastyFiles.isEmpty) {
       println("tastyFiles is empty")
       InspectResult.empty()
     } else {
-      val classLoader = new URLClassLoader(wartClasspath, getClass.getClassLoader)
-      val (errorLoadFail, errorTraversers) = errorWarts.toList.partitionMap(Plugin.loadWart(_, classLoader))
-      val (warnLoadFail, warningTraversers) = warningWarts.toList.partitionMap(Plugin.loadWart(_, classLoader))
-      println("load fail warts = " + (errorLoadFail ++ warnLoadFail).map(_._1).mkString(", "))
-      if (errorTraversers.isEmpty && warningWarts.isEmpty) {
+      val classLoader = new URLClassLoader(param.wartClasspath, getClass.getClassLoader)
+      val (errorLoadFail, errorTraversers) = param.errorWarts.toList.partitionMap(Plugin.loadWart(_, classLoader))
+      val (warnLoadFail, warningTraversers) = param.warningWarts.toList.partitionMap(Plugin.loadWart(_, classLoader))
+      val loadFailed = errorLoadFail ++ warnLoadFail
+      if (loadFailed.nonEmpty) {
+        if (param.failIfWartLoadError) {
+          throw loadFailed.head._2
+        } else {
+          println("load fail warts = " + loadFailed.map(_._1).mkString(", "))
+        }
+      }
+      if (errorTraversers.isEmpty && warningTraversers.isEmpty) {
         println("warts is empty")
         InspectResult.empty()
       } else {
         runImpl(
           errorTraversers = errorTraversers,
           warningTraversers = warningTraversers,
-          tastyFiles = tastyFiles.toList,
-          dependenciesClasspath = dependenciesClasspath.toList,
+          tastyFiles = param.tastyFiles.toList,
+          dependenciesClasspath = param.dependenciesClasspath.toList,
         )
       }
     }

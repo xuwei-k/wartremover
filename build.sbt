@@ -23,6 +23,17 @@ lazy val allScalaVersions = Seq(
   "3.1.2",
 )
 
+addCommandAlias(
+  "testInspectorScripted",
+  List(
+    "scalafmtAll",
+    s"++ ${latestScala3}!",
+    "all core-cross-binary/publishLocal inspector/publishLocal",
+    s"++ ${latestScala212}!",
+    "sbt-plugin/scripted wartremover/inspector",
+  ).mkString(";")
+)
+
 def latestScala212 = latest(12, allScalaVersions)
 def latestScala213 = latest(13, allScalaVersions)
 def latestScala3 = allScalaVersions.last // TODO more better way
@@ -211,10 +222,9 @@ lazy val inspectorInterface = Project(
   base = file("inspector-interface")
 ).settings(
   commonSettings,
+  publish / skip := (scalaBinaryVersion.value == "2.13"),
+  crossScalaVersions := Seq(latestScala3, latestScala212),
   name := "wartremover-inspector-interface",
-  Compile / compile / javacOptions ++= Seq("-source", "1.8", "-target", "1.8"),
-  crossPaths := false,
-  autoScalaLibrary := false,
 )
 
 lazy val inspector = Project(

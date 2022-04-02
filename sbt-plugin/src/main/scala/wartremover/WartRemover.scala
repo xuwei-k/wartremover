@@ -155,10 +155,8 @@ object WartRemover extends sbt.AutoPlugin {
           val s = state.value
           val extracted = Project.extract(s)
           val myProject = thisProjectRef.value
-          def skipLog(reason: String) = {
-            val thisTaskName = s"${myProject.project}/${x.name}/${wartremoverInspect.key.label}"
-            log.info(s"skip ${thisTaskName} because ${reason}")
-          }
+          val thisTaskName = s"${myProject.project}/${x.name}/${wartremoverInspect.key.label}"
+          def skipLog(reason: String): Unit = log.info(s"skip ${thisTaskName} because ${reason}")
           if (scalaBinaryVersion.value == "3") {
             val errorWartNames = (x / wartremoverInspect / wartremoverErrors).value
             val warningWartNames = (x / wartremoverInspect / wartremoverWarnings).value
@@ -172,34 +170,45 @@ object WartRemover extends sbt.AutoPlugin {
                 import scala.language.reflectiveCalls
                 val loader = extracted.runTask(generateProject / Test / testLoader, s)._2
                 val clazz = loader.loadClass("org.wartremover.WartRemoverInspector")
-                val instance = clazz.getConstructor().newInstance().asInstanceOf[org.wartremover.WartInspector]
+                val instance = clazz
+                  .getConstructor()
+                  .newInstance()
+                  .asInstanceOf[
+                    {
+                      def run(param: org.wartremover.InspectParam): org.wartremover.InspectResult
+                    }
+                  ]
+
+                val dependenciesClasspath = extracted.runTask(myProject / x / fullClasspath, s)._2
                 log.info(
-                  s"running ${myProject.project}/${x.name}/${wartremoverInspect.key.label}. errorWarts = ${errorWartNames}, warningWarts = ${warningWartNames}"
+                  s"running ${thisTaskName}. errorWarts = ${errorWartNames}, warningWarts = ${warningWartNames}"
                 )
-                val result = instance.run(new org.wartremover.InspectParam {
-                  override val tastyFiles = tastys.map(_.getAbsolutePath).toArray
-                  override val dependenciesClasspath = (x / fullClasspath).value.map(_.data.getAbsolutePath).toArray
-                  override val wartClasspath = {
-                    extracted
-                      .runTask(myProject / x / wartremoverClasspaths, s)
-                      ._2
-                      .map {
-                        case a if a.startsWith("file:") =>
-                          file(a.drop("file:".length)).getCanonicalFile.toURI.toURL
-                        case a =>
-                          new URL(a)
-                      }
-                      .toArray
-                  }
-                  override val errorWarts = errorWartNames.map(_.clazz).toArray
-                  override val warningWarts = warningWartNames.map(_.clazz).toArray
-                  override val failIfWartLoadError = (x / wartremoverFailIfWartLoadError).value
-                })
+                val result = instance.run(
+                  org.wartremover.InspectParam(
+                    tastyFiles = tastys.map(_.getAbsolutePath),
+                    dependenciesClasspath = dependenciesClasspath.map(_.data.getAbsolutePath),
+                    wartClasspath = {
+                      extracted
+                        .runTask(myProject / x / wartremoverClasspaths, s)
+                        ._2
+                        .map {
+                          case a if a.startsWith("file:") =>
+                            file(a.drop("file:".length)).getCanonicalFile.toURI.toURL
+                          case a =>
+                            new URL(a)
+                        }
+                        .map(_.toString) // TODO
+                    },
+                    errorWarts = errorWartNames.map(_.clazz),
+                    warningWarts = warningWartNames.map(_.clazz),
+                    failIfWartLoadError = (x / wartremoverFailIfWartLoadError).value,
+                  )
+                )
                 if (result.errors.nonEmpty && (x / wartremoverInspectFailOnErrors).value) {
                   sys.error(s"[${myProject.project}] wart error found")
                 } else {
                   log.info(
-                    s"finished ${myProject.project}/${x.name}/${wartremoverInspect.key.label}"
+                    s"finished ${thisTaskName}"
                   )
                 }
               }
