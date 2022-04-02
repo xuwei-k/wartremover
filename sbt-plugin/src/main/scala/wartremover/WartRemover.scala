@@ -233,10 +233,12 @@ object WartRemover extends sbt.AutoPlugin {
 
                 val logStr = {
                   def names(xs: Seq[Wart]): List[String] = {
-                    xs.groupBy(a => a.clazz.split('.').lastOption.getOrElse(a.clazz))
+                    xs.map(_.clazz)
+                      .distinct
+                      .groupBy(a => a.split('.').lastOption.getOrElse(a))
                       .flatMap {
                         case (k, v) if v.size == 1 => k :: Nil
-                        case (_, v) => v.map(_.clazz)
+                        case (_, v) => v
                       }
                       .toList
                       .sorted
@@ -281,6 +283,7 @@ object WartRemover extends sbt.AutoPlugin {
                   }
                 }
                 (x / wartremoverInspectFile).?.value.foreach { outFile =>
+                  log.info(s"[${thisProjectRef.value.project}] write result to ${outFile}")
                   IO.write(outFile, resultJson)
                 }
                 if (result.errors.nonEmpty && (x / wartremoverInspectFailOnErrors).value) {
