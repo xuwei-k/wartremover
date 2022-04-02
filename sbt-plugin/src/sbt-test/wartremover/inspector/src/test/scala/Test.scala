@@ -1,3 +1,5 @@
 package example
 
-class Test
+class Test {
+  def x: Int = return 3
+}

@@ -18,6 +18,7 @@ object WartRemover extends sbt.AutoPlugin {
   object autoImport {
     val wartremoverFailIfWartLoadError = settingKey[Boolean]("")
     val wartremoverInspect = taskKey[InspectResult]("run wartremover by TASTy inspector")
+    val wartremoverInspectFile = settingKey[File]("")
     val wartremoverInspectOutputStandardReporter = settingKey[Boolean]("")
     val wartremoverInspectFailOnErrors = settingKey[Boolean]("")
     val wartremoverInspectScalaVersion = settingKey[String]("scala version for wartremoverInspect task")
@@ -205,7 +206,7 @@ object WartRemover extends sbt.AutoPlugin {
     x / wartremoverInspect := Def.taskDyn {
       val log = streams.value.log
       val myProject = thisProjectRef.value
-      val thisTaskName = s"${myProject.project}/${x.name}/${wartremoverInspect.key.label}"
+      val thisTaskName = s"${myProject.project}/${x.id}/${wartremoverInspect.key.label}"
       def skipLog(reason: String) = Def.task {
         log.info(s"skip ${thisTaskName} because ${reason}")
         InspectResult.empty
@@ -218,51 +219,75 @@ object WartRemover extends sbt.AutoPlugin {
         } else {
           Def.taskDyn {
             val tastys = (x / tastyFiles).value
-            Def.taskDyn {
-              if (tastys.isEmpty) {
-                skipLog(s"${tastyFiles.key.label} is empty")
-              } else {
-                Def.taskDyn {
-                  import scala.language.reflectiveCalls
-                  val loader = (generateProject / Test / testLoader).value
-                  val clazz = loader.loadClass("org.wartremover.WartRemoverInspector")
-                  val instance =
-                    clazz.getConstructor().newInstance().asInstanceOf[{ def runFromJson(json: String): String }]
+            if (tastys.isEmpty) {
+              skipLog(s"${tastyFiles.key.label} is empty")
+            } else {
+              Def.taskDyn {
+                import scala.language.reflectiveCalls
+                val loader = (generateProject / Test / testLoader).value
+                val clazz = loader.loadClass("org.wartremover.WartRemoverInspector")
+                val instance =
+                  clazz.getConstructor().newInstance().asInstanceOf[{ def runFromJson(json: String): String }]
 
-                  val dependenciesClasspath = (x / fullClasspath).value
-                  log.info(
-                    s"running ${thisTaskName}. errorWarts = ${errorWartNames}, warningWarts = ${warningWartNames}"
-                  )
-                  val param = org.wartremover.InspectParam(
-                    tastyFiles = tastys.map(_.getAbsolutePath).toList,
-                    dependenciesClasspath = dependenciesClasspath.map(_.data.getAbsolutePath).toList,
-                    wartClasspath = {
-                      val filePrefix = "file:"
-                      (x / wartremoverClasspaths).value.map {
-                        case a if a.startsWith(filePrefix) =>
-                          file(a.drop(filePrefix.length)).getCanonicalFile.toURI.toURL
-                        case a =>
-                          new URL(a)
-                      }.map(_.toString) // TODO
-                    }.toList,
-                    errorWarts = errorWartNames.map(_.clazz).toList,
-                    warningWarts = warningWartNames.map(_.clazz).toList,
-                    failIfWartLoadError = (x / wartremoverFailIfWartLoadError).value,
-                    outputStandardReporter = (x / wartremoverInspectOutputStandardReporter).value
-                  )
-                  val result = {
-                    val json = instance.runFromJson(param.toJsonString)
-                    val r = json.decodeFromJsonString[InspectResult]
-                    new InspectResult(errors = r.errors, warnings = r.warnings) {
-                      override def toString: String = json
+                val dependenciesClasspath = (x / fullClasspath).value
+
+                val logStr = {
+                  def names(xs: Seq[Wart]): List[String] = {
+                    xs.groupBy(a => a.clazz.split('.').lastOption.getOrElse(a.clazz))
+                      .flatMap {
+                        case (k, v) if v.size == 1 => k :: Nil
+                        case (_, v) => v.map(_.clazz)
+                      }
+                      .toList
+                      .sorted
+                  }
+
+                  List(
+                    if (errorWartNames.nonEmpty) {
+                      names(errorWartNames).mkString("errorWarts = [", ", ", "].")
+                    } else {
+                      ""
+                    },
+                    if (warningWartNames.nonEmpty) {
+                      names(warningWartNames).mkString("warningWarts = [", ", ", "]")
+                    } else {
+                      ""
                     }
+                  ).mkString(" ")
+                }
+                log.info(s"running ${thisTaskName}. ${logStr}")
+                val param = org.wartremover.InspectParam(
+                  tastyFiles = tastys.map(_.getAbsolutePath).toList,
+                  dependenciesClasspath = dependenciesClasspath.map(_.data.getAbsolutePath).toList,
+                  wartClasspath = {
+                    val filePrefix = "file:"
+                    (x / wartremoverClasspaths).value.map {
+                      case a if a.startsWith(filePrefix) =>
+                        file(a.drop(filePrefix.length)).getCanonicalFile.toURI.toURL
+                      case a =>
+                        new URL(a)
+                    }.map(_.toString)
+                  }.toList,
+                  errorWarts = errorWartNames.map(_.clazz).toList,
+                  warningWarts = warningWartNames.map(_.clazz).toList,
+                  failIfWartLoadError = (x / wartremoverFailIfWartLoadError).value,
+                  outputStandardReporter = (x / wartremoverInspectOutputStandardReporter).value
+                )
+                val resultJson = instance.runFromJson(param.toJsonString)
+                val result = {
+                  val r = resultJson.decodeFromJsonString[InspectResult]
+                  new InspectResult(errors = r.errors, warnings = r.warnings) {
+                    override def toString: String = resultJson
                   }
-                  if (result.errors.nonEmpty && (x / wartremoverInspectFailOnErrors).value) {
-                    sys.error(s"[${thisProjectRef.value.project}] wart error found")
-                  } else {
-                    log.info(s"finished ${thisTaskName}")
-                    Def.task(result)
-                  }
+                }
+                (x / wartremoverInspectFile).?.value.foreach { outFile =>
+                  IO.write(outFile, resultJson)
+                }
+                if (result.errors.nonEmpty && (x / wartremoverInspectFailOnErrors).value) {
+                  sys.error(s"[${thisProjectRef.value.project}] wart error found")
+                } else {
+                  log.info(s"finished ${thisTaskName}")
+                  Def.task(result)
                 }
               }
             }
