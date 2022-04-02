@@ -39,6 +39,7 @@ object WartRemover extends sbt.AutoPlugin {
       // need NIGHTLY version because there are some bugs in old tasty-inspector.
       "3.1.3-RC1-bin-20220401-4a96ce7-NIGHTLY"
     },
+    excludeLintKeys += wartremoverInspectFile,
     wartremoverCrossVersion := CrossVersion.full,
     wartremoverDependencies := Nil,
     wartremoverErrors := Nil,
