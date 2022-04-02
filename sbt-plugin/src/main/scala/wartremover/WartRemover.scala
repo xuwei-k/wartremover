@@ -11,7 +11,6 @@ import sbt.librarymanagement.UnresolvedWarningConfiguration
 import sbt.librarymanagement.UpdateConfiguration
 import sbt.librarymanagement.ivy.IvyDependencyResolution
 import sjsonnew.JsonFormat
-import sjsonnew.JsonReader
 import sjsonnew.support.scalajson.unsafe.CompactPrinter
 
 object WartRemover extends sbt.AutoPlugin {
@@ -159,10 +158,9 @@ object WartRemover extends sbt.AutoPlugin {
     import sjsonnew.BasicJsonProtocol.*
 
     implicit val sourceFileInstance: JsonFormat[org.wartremover.SourceFile] =
-      caseClass3(org.wartremover.SourceFile, org.wartremover.SourceFile.unapply)(
+      caseClass2(org.wartremover.SourceFile, org.wartremover.SourceFile.unapply)(
         "name",
         "path",
-        "content",
       )
 
     implicit val positionInstance: JsonFormat[org.wartremover.Position] =

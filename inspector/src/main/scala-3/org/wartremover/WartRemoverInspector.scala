@@ -95,7 +95,6 @@ class WartRemoverInspector {
             sourceFile = org.wartremover.SourceFile(
               name = p.sourceFile.name,
               path = p.sourceFile.path,
-              content = p.sourceFile.content,
             ),
             sourceCode = p.sourceCode,
           )
