@@ -18,7 +18,7 @@ object WartRemover extends sbt.AutoPlugin {
   object autoImport {
     val wartremoverFailIfWartLoadError = settingKey[Boolean]("")
     val wartremoverInspect = taskKey[InspectResult]("run wartremover by TASTy inspector")
-    val wartremoverInspectFile = settingKey[Option[File]]("")
+    val wartremoverInspectOutputFile = settingKey[Option[File]]("")
     val wartremoverInspectOutputStandardReporter = settingKey[Boolean]("")
     val wartremoverInspectFailOnErrors = settingKey[Boolean]("")
     val wartremoverInspectScalaVersion = settingKey[String]("scala version for wartremoverInspect task")
@@ -39,7 +39,7 @@ object WartRemover extends sbt.AutoPlugin {
       // need NIGHTLY version because there are some bugs in old tasty-inspector.
       "3.1.3-RC1-bin-20220401-4a96ce7-NIGHTLY"
     },
-    excludeLintKeys += wartremoverInspectFile,
+    excludeLintKeys += wartremoverInspectOutputFile,
     wartremoverCrossVersion := CrossVersion.full,
     wartremoverDependencies := Nil,
     wartremoverErrors := Nil,
@@ -281,7 +281,7 @@ object WartRemover extends sbt.AutoPlugin {
                   override def toString: String = resultJson
                 }
               }
-              (x / wartremoverInspectFile).value.foreach { outFile =>
+              (x / wartremoverInspectOutputFile).value.foreach { outFile =>
                 log.info(s"[${thisProjectRef.value.project}] write result to ${outFile}")
                 IO.write(outFile, resultJson)
               }

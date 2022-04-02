@@ -7,6 +7,6 @@ scalaVersion := "3.1.2"
 
 ThisBuild / wartremoverCrossVersion := CrossVersion.binary
 
-Compile / wartremoverInspectFile := Some(baseDirectory.value / "warts-main.json")
+Compile / wartremoverInspectOutputFile := Some(baseDirectory.value / "warts-main.json")
 
-Test / wartremoverInspectFile := Some(baseDirectory.value / "warts-test.json")
+Test / wartremoverInspectOutputFile := Some(baseDirectory.value / "warts-test.json")
