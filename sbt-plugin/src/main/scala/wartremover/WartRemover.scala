@@ -307,13 +307,11 @@ object WartRemover extends sbt.AutoPlugin {
         )
       )
     },
-    Seq(Compile, Test).flatMap { x =>
-      Seq(
-        x / wartremoverFailIfWartLoadError := false,
-        x / wartremoverInspectFailOnErrors := true,
-        x / wartremoverInspectOutputStandardReporter := true,
-        inspectTask(x)
-      )
+    wartremoverFailIfWartLoadError := false,
+    wartremoverInspectFailOnErrors := true,
+    wartremoverInspectOutputStandardReporter := true,
+    Seq(Compile, Test).map { x =>
+      inspectTask(x)
     },
     scalacOptionSetting(scalacOptions),
     scalacOptionSetting(Compile / scalacOptions),

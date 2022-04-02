@@ -5,5 +5,7 @@ $ must-mirror warts-main.json check1.json
 > compile
 -> show wartremoverInspect
 $ must-mirror warts-main.json check2.json
+> set Test / wartremoverInspect / wartremoverErrors := Nil
+> set Test / wartremoverInspect / wartremoverWarnings ++= Warts.all
 > show Test/wartremoverInspect
 $ must-mirror warts-test.json check3.json
