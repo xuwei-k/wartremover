@@ -1,6 +1,6 @@
 package org.wartremover
 
-final case class InspectResult(
+case class InspectResult(
   errors: List[Diagnostic],
   warnings: List[Diagnostic],
 )

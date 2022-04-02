@@ -17,7 +17,7 @@ object WartRemover extends sbt.AutoPlugin {
   override def trigger = allRequirements
   object autoImport {
     val wartremoverFailIfWartLoadError = settingKey[Boolean]("")
-    val wartremoverInspect = taskKey[Unit]("run wartremover by TASTy inspector")
+    val wartremoverInspect = taskKey[InspectResult]("run wartremover by TASTy inspector")
     val wartremoverInspectOutputStandardReporter = settingKey[Boolean]("")
     val wartremoverInspectFailOnErrors = settingKey[Boolean]("")
     val wartremoverInspectScalaVersion = settingKey[String]("scala version for wartremoverInspect task")
@@ -207,78 +207,85 @@ object WartRemover extends sbt.AutoPlugin {
     }
   }
 
-  private[this] def inspectTask(x: Configuration) = {
-    x / wartremoverInspect := {
+  private[this] def inspectTask(x: Configuration): Def.Setting[Task[InspectResult]] = {
+    x / wartremoverInspect := Def.taskDyn {
       val log = streams.value.log
-      val s = state.value
-      val extracted = Project.extract(s)
       val myProject = thisProjectRef.value
       val thisTaskName = s"${myProject.project}/${x.name}/${wartremoverInspect.key.label}"
-      def skipLog(reason: String): Unit = log.info(s"skip ${thisTaskName} because ${reason}")
+      def skipLog(reason: String) = Def.task {
+        log.info(s"skip ${thisTaskName} because ${reason}")
+        InspectResult.empty
+      }
       if (scalaBinaryVersion.value == "3") {
         val errorWartNames = (x / wartremoverInspect / wartremoverErrors).value
         val warningWartNames = (x / wartremoverInspect / wartremoverWarnings).value
         if (errorWartNames.isEmpty && warningWartNames.isEmpty) {
           skipLog("warts is empty")
         } else {
-          val tastys = extracted.runTask(myProject / x / tastyFiles, s)._2
-          if (tastys.isEmpty) {
-            skipLog(s"${tastyFiles.key.label} is empty")
-          } else {
-            import scala.language.reflectiveCalls
-            val loader = extracted.runTask(generateProject / Test / testLoader, s)._2
-            val clazz = loader.loadClass("org.wartremover.WartRemoverInspector")
-            val instance = clazz
-              .getConstructor()
-              .newInstance()
-              .asInstanceOf[
-                {
-                  def run(json: String): String
-                }
-              ]
+          Def.taskDyn {
+            val tastys = (x / tastyFiles).value
+            Def.taskDyn {
+              if (tastys.isEmpty) {
+                skipLog(s"${tastyFiles.key.label} is empty")
+              } else {
+                Def.taskDyn {
+                  import scala.language.reflectiveCalls
+                  val loader = (generateProject / Test / testLoader).value
+                  val clazz = loader.loadClass("org.wartremover.WartRemoverInspector")
+                  val instance = clazz
+                    .getConstructor()
+                    .newInstance()
+                    .asInstanceOf[{
+                        def run(json: String): String
+                      }
+                    ]
 
-            val dependenciesClasspath = extracted.runTask(myProject / x / fullClasspath, s)._2
-            log.info(
-              s"running ${thisTaskName}. errorWarts = ${errorWartNames}, warningWarts = ${warningWartNames}"
-            )
-            val param = org.wartremover.InspectParam(
-              tastyFiles = tastys.map(_.getAbsolutePath).toList,
-              dependenciesClasspath = dependenciesClasspath.map(_.data.getAbsolutePath).toList,
-              wartClasspath = {
-                extracted
-                  .runTask(myProject / x / wartremoverClasspaths, s)
-                  ._2
-                  .map {
-                    case a if a.startsWith("file:") =>
-                      file(a.drop("file:".length)).getCanonicalFile.toURI.toURL
-                    case a =>
-                      new URL(a)
+                  val dependenciesClasspath = (x / fullClasspath).value
+                  log.info(
+                    s"running ${thisTaskName}. errorWarts = ${errorWartNames}, warningWarts = ${warningWartNames}"
+                  )
+                  val param = org.wartremover.InspectParam(
+                    tastyFiles = tastys.map(_.getAbsolutePath).toList,
+                    dependenciesClasspath = dependenciesClasspath.map(_.data.getAbsolutePath).toList,
+                    wartClasspath = {
+                      val filePrefix = "file:"
+                      (x / wartremoverClasspaths).value.map {
+                        case a if a.startsWith(filePrefix) =>
+                          file(a.drop(filePrefix.length)).getCanonicalFile.toURI.toURL
+                        case a =>
+                          new URL(a)
+                      }.map(_.toString) // TODO
+                    }.toList,
+                    errorWarts = errorWartNames.map(_.clazz).toList,
+                    warningWarts = warningWartNames.map(_.clazz).toList,
+                    failIfWartLoadError = (x / wartremoverFailIfWartLoadError).value,
+                    outputStandardReporter = (x / wartremoverInspectOutputStandardReporter).value
+                  )
+                  val result = {
+                    val json = instance.run(param.toJsonString)
+                    println(json)
+                    val r = json.decodeFromJsonString[InspectResult]
+                    new InspectResult(errors = r.errors, warnings = r.warnings) {
+                      override def toString: String = json
+                    }
                   }
-                  .map(_.toString) // TODO
-              }.toList,
-              errorWarts = errorWartNames.map(_.clazz).toList,
-              warningWarts = warningWartNames.map(_.clazz).toList,
-              failIfWartLoadError = (x / wartremoverFailIfWartLoadError).value,
-              outputStandardReporter = (x / wartremoverInspectOutputStandardReporter).value
-            )
-            val result = {
-              val json = instance.run(param.toJsonString)
-              println(json)
-              json.decodeFromJsonString[InspectResult]
-            }
-            if (result.errors.nonEmpty && (x / wartremoverInspectFailOnErrors).value) {
-              sys.error(s"[${myProject.project}] wart error found")
-            } else {
-              log.info(
-                s"finished ${thisTaskName}"
-              )
+                  if (result.errors.nonEmpty && (x / wartremoverInspectFailOnErrors).value) {
+                    sys.error(s"[${thisProjectRef.value.project}] wart error found")
+                  } else {
+                    log.info(
+                      s"finished ${thisTaskName}"
+                    )
+                    Def.task(result)
+                  }
+                }
+              }
             }
           }
         }
       } else {
         skipLog(s"scalaVersion is ${scalaVersion.value}. not Scala 3")
       }
-    }
+    }.value
   }
 
   override lazy val projectSettings: Seq[Def.Setting[_]] = Def.settings(
