@@ -28,9 +28,9 @@ addCommandAlias(
   List(
     "scalafmtAll",
     s"++ ${latestScala3}!",
-    "all core-cross-binary/publishLocal inspector/publishLocal inspector-interface/publishLocal",
+    "all core-cross-binary/publishLocal inspector/publishLocal inspector-common/publishLocal",
     s"++ ${latestScala212}!",
-    "inspector-interface/publishLocal",
+    "inspector-common/publishLocal",
     "sbt-plugin/scripted wartremover/inspector",
   ).mkString(";")
 )
@@ -218,14 +218,14 @@ lazy val coreCrossBinary = Project(
   crossVersion := CrossVersion.binary
 ).dependsOn(testMacros % "test->compile")
 
-lazy val inspectorInterface = Project(
-  id = "inspector-interface",
-  base = file("inspector-interface")
+lazy val inspectorCommon = Project(
+  id = "inspector-common",
+  base = file("inspector-common")
 ).settings(
   commonSettings,
   publish / skip := (scalaBinaryVersion.value == "2.13"),
   crossScalaVersions := Seq(latestScala3, latestScala212),
-  name := "wartremover-inspector-interface",
+  name := "wartremover-inspector-common",
 )
 
 lazy val inspector = Project(
@@ -248,7 +248,7 @@ lazy val inspector = Project(
   }
 ).dependsOn(
   coreCrossBinary,
-  inspectorInterface,
+  inspectorCommon,
 )
 
 lazy val core = Project(
@@ -364,7 +364,7 @@ lazy val sbtPlug: Project = Project(
     Seq(file)
   }
 ).enablePlugins(ScriptedPlugin)
-  .dependsOn(inspectorInterface)
+  .dependsOn(inspectorCommon)
 
 lazy val testMacros: Project = Project(
   id = "test-macros",

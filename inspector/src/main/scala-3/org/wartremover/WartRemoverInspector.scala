@@ -3,11 +3,7 @@ package org.wartremover
 import argonaut.DecodeJson
 import argonaut.EncodeJson
 import java.net.URLClassLoader
-import java.nio.file.Path
-import java.util.Optional
-import java.util.concurrent.atomic.AtomicInteger
 import scala.quoted.Quotes
-import scala.reflect.NameTransformer
 import scala.tasty.inspector.Inspector
 import scala.tasty.inspector.Tasty
 import scala.tasty.inspector.TastyInspector
@@ -15,16 +11,19 @@ import scala.util.control.NonFatal
 import java.net.URL
 
 class WartRemoverInspector {
-  private[this] implicit val sourceFileInstance: EncodeJson[SourceFile] =
-    EncodeJson.derive[SourceFile]
-  private[this] implicit val positionInstance: EncodeJson[Position] =
-    EncodeJson.derive[Position]
-  private[this] implicit val diagnosticInstance: EncodeJson[Diagnostic] =
-    EncodeJson.derive[Diagnostic]
-  private[this] implicit val inspectResultInstance: EncodeJson[InspectResult] =
-    EncodeJson.derive[InspectResult]
   private[this] implicit val inspectParamInstance: DecodeJson[InspectParam] =
     DecodeJson.derive[InspectParam]
+
+  private[this] implicit val inspectResultInstance: EncodeJson[InspectResult] = {
+    implicit val sourceFileInstance: EncodeJson[SourceFile] =
+      EncodeJson.derive[SourceFile]
+    implicit val positionInstance: EncodeJson[Position] =
+      EncodeJson.derive[Position]
+    implicit val diagnosticInstance: EncodeJson[Diagnostic] =
+      EncodeJson.derive[Diagnostic]
+
+    EncodeJson.derive[InspectResult]
+  }
 
   def run(json: String): String = {
     val param = argonaut.JsonParser
@@ -100,7 +99,7 @@ class WartRemoverInspector {
           )
         }
 
-        def run(onlyWarning: Boolean, traverser: WartTraverser) = {
+        def run(onlyWarning: Boolean, traverser: WartTraverser): Unit = {
           val universe: WartUniverse.Aux[q.type] =
             new WartUniverse(onlyWarning = onlyWarning, logLevel = LogLevel.Debug) {
               override type Q = q.type
