@@ -202,7 +202,6 @@ object WartRemover extends sbt.AutoPlugin {
   private[this] implicit class JsonStringOps(private val string: String) extends AnyVal {
     def decodeFromJsonString[A](implicit r: sjsonnew.JsonReader[A]): A = {
       val json = sjsonnew.support.scalajson.unsafe.Parser.parseUnsafe(string)
-      println(json)
       val unbuilder = new sjsonnew.Unbuilder(sjsonnew.support.scalajson.unsafe.Converter.facade)
       r.read(Some(json), unbuilder)
     }
@@ -272,7 +271,11 @@ object WartRemover extends sbt.AutoPlugin {
                   warningWarts = warningWartNames.map(_.clazz).toList,
                   failIfWartLoadError = (x / wartremoverFailIfWartLoadError).value,
                 )
-                val result = instance.run(param.toJsonString).decodeFromJsonString[InspectResult]
+                val result = {
+                  val json = instance.run(param.toJsonString)
+                  println(json)
+                  json.decodeFromJsonString[InspectResult]
+                }
                 if (result.errors.nonEmpty && (x / wartremoverInspectFailOnErrors).value) {
                   sys.error(s"[${myProject.project}] wart error found")
                 } else {
