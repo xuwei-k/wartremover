@@ -1,5 +1,5 @@
 > wartremoverInspect
 > set Compile / wartremoverInspect / wartremoverErrors ++= Warts.all
 > compile
--> wartremoverInspect
-> Test/wartremoverInspect
+-> show wartremoverInspect
+> show Test/wartremoverInspect

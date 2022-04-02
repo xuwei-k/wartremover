@@ -7,16 +7,13 @@ import scala.quoted.Quotes
 import scala.tasty.inspector.Inspector
 import scala.tasty.inspector.Tasty
 import scala.tasty.inspector.TastyInspector
-import scala.util.control.NonFatal
 import java.net.URL
 
-class WartRemoverInspector {
+final class WartRemoverInspector {
   private[this] implicit val inspectParamInstance: DecodeJson[InspectParam] =
     DecodeJson.derive[InspectParam]
 
   private[this] implicit val inspectResultInstance: EncodeJson[InspectResult] = {
-    implicit val sourceFileInstance: EncodeJson[SourceFile] =
-      EncodeJson.derive[SourceFile]
     implicit val positionInstance: EncodeJson[Position] =
       EncodeJson.derive[Position]
     implicit val diagnosticInstance: EncodeJson[Diagnostic] =
@@ -25,7 +22,7 @@ class WartRemoverInspector {
     EncodeJson.derive[InspectResult]
   }
 
-  def run(json: String): String = {
+  def runFromJson(json: String): String = {
     val param = argonaut.JsonParser
       .parse(json)
       .left
@@ -40,9 +37,7 @@ class WartRemoverInspector {
     implicitly[EncodeJson[InspectResult]].encode(result).spaces2
   }
 
-  private[this] def run(param: InspectParam): InspectResult = {
-    println("dependenciesClasspath = " + param.dependenciesClasspath.toList)
-    println("wartClasspath = " + param.wartClasspath.toList)
+  def run(param: InspectParam): InspectResult = {
     if (param.tastyFiles.isEmpty) {
       println("tastyFiles is empty")
       InspectResult.empty
@@ -62,21 +57,23 @@ class WartRemoverInspector {
         println("warts is empty")
         InspectResult.empty
       } else {
-        runImpl(
+        run0(
           errorTraversers = errorTraversers,
           warningTraversers = warningTraversers,
           tastyFiles = param.tastyFiles.toList,
           dependenciesClasspath = param.dependenciesClasspath.toList,
+          outputReporter = param.outputStandardReporter,
         )
       }
     }
   }
 
-  private[this] def runImpl(
+  private[this] def run0(
     errorTraversers: List[WartTraverser],
     warningTraversers: List[WartTraverser],
     tastyFiles: List[String],
     dependenciesClasspath: List[String],
+    outputReporter: Boolean
   ): InspectResult = {
     val errors, warnings = List.newBuilder[Diagnostic]
 
@@ -91,10 +88,7 @@ class WartRemoverInspector {
             end = p.end,
             endLine = p.endLine,
             endColumn = p.endColumn,
-            sourceFile = org.wartremover.SourceFile(
-              name = p.sourceFile.name,
-              path = p.sourceFile.path,
-            ),
+            path = p.sourceFile.path,
             sourceCode = p.sourceCode,
           )
         }
@@ -109,14 +103,18 @@ class WartRemoverInspector {
                   message = msg,
                   position = convertPos(pos),
                 )
-                super.onError(msg = msg, pos = pos)
+                if (outputReporter) {
+                  super.onError(msg = msg, pos = pos)
+                }
               }
               override def onWarn(msg: String, pos: Position): Unit = {
                 warnings += Diagnostic(
                   message = msg,
                   position = convertPos(pos),
                 )
-                super.onWarn(msg = msg, pos = pos)
+                if (outputReporter) {
+                  super.onWarn(msg = msg, pos = pos)
+                }
               }
             }
 
@@ -137,9 +135,14 @@ class WartRemoverInspector {
       dependenciesClasspath = dependenciesClasspath,
     )(inspector)
 
+    implicit val ord: Ordering[Diagnostic] = Ordering.by { a =>
+      val p = a.position
+      (p.path, p.start, a.message)
+    }
+
     InspectResult(
-      errors = errors.result(),
-      warnings = warnings.result()
+      errors = errors.result().sorted,
+      warnings = warnings.result().sorted
     )
   }
 }

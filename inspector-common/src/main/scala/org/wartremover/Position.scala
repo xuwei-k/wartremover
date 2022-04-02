@@ -7,6 +7,6 @@ final case class Position(
   end: Int,
   endLine: Int,
   endColumn: Int,
-  sourceFile: SourceFile,
+  path: String,
   sourceCode: Option[String],
 )

@@ -159,12 +159,6 @@ object WartRemover extends sbt.AutoPlugin {
   private[this] implicit val inspectResultFormat: JsonFormat[InspectResult] = {
     import sjsonnew.BasicJsonProtocol.*
 
-    implicit val sourceFileInstance: JsonFormat[org.wartremover.SourceFile] =
-      caseClass2(org.wartremover.SourceFile, org.wartremover.SourceFile.unapply)(
-        "name",
-        "path",
-      )
-
     implicit val positionInstance: JsonFormat[org.wartremover.Position] =
       caseClass8(org.wartremover.Position, org.wartremover.Position.unapply)(
         "start",
@@ -173,7 +167,7 @@ object WartRemover extends sbt.AutoPlugin {
         "end",
         "endLine",
         "endColumn",
-        "sourceFile",
+        "path",
         "sourceCode",
       )
 
@@ -232,13 +226,8 @@ object WartRemover extends sbt.AutoPlugin {
                   import scala.language.reflectiveCalls
                   val loader = (generateProject / Test / testLoader).value
                   val clazz = loader.loadClass("org.wartremover.WartRemoverInspector")
-                  val instance = clazz
-                    .getConstructor()
-                    .newInstance()
-                    .asInstanceOf[{
-                        def run(json: String): String
-                      }
-                    ]
+                  val instance =
+                    clazz.getConstructor().newInstance().asInstanceOf[{ def runFromJson(json: String): String }]
 
                   val dependenciesClasspath = (x / fullClasspath).value
                   log.info(
@@ -262,8 +251,7 @@ object WartRemover extends sbt.AutoPlugin {
                     outputStandardReporter = (x / wartremoverInspectOutputStandardReporter).value
                   )
                   val result = {
-                    val json = instance.run(param.toJsonString)
-                    println(json)
+                    val json = instance.runFromJson(param.toJsonString)
                     val r = json.decodeFromJsonString[InspectResult]
                     new InspectResult(errors = r.errors, warnings = r.warnings) {
                       override def toString: String = json
@@ -272,9 +260,7 @@ object WartRemover extends sbt.AutoPlugin {
                   if (result.errors.nonEmpty && (x / wartremoverInspectFailOnErrors).value) {
                     sys.error(s"[${thisProjectRef.value.project}] wart error found")
                   } else {
-                    log.info(
-                      s"finished ${thisTaskName}"
-                    )
+                    log.info(s"finished ${thisTaskName}")
                     Def.task(result)
                   }
                 }
