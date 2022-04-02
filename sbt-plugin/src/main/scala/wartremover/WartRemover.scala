@@ -12,6 +12,7 @@ import sbt.librarymanagement.ivy.IvyDependencyResolution
 object WartRemover extends sbt.AutoPlugin {
   override def trigger = allRequirements
   object autoImport {
+    val wartremoverFailIfWartLoadError = settingKey[Boolean]("")
     val wartremoverInspect = taskKey[Unit]("run wartremover by TASTy inspector")
     val wartremoverInspectFailOnErrors = settingKey[Boolean]("")
     val wartremoverInspectScalaVersion = settingKey[String]("scala version for wartremoverInspect task")
@@ -147,6 +148,7 @@ object WartRemover extends sbt.AutoPlugin {
     },
     Seq(Compile, Test).flatMap { x =>
       Seq(
+        x / wartremoverFailIfWartLoadError := false,
         x / wartremoverInspectFailOnErrors := true,
         x / wartremoverInspect := {
           val log = streams.value.log
@@ -158,9 +160,9 @@ object WartRemover extends sbt.AutoPlugin {
             log.info(s"skip ${thisTaskName} because ${reason}")
           }
           if (scalaBinaryVersion.value == "3") {
-            val errorWarts = (x / wartremoverInspect / wartremoverErrors).value
-            val warningWarts = (x / wartremoverInspect / wartremoverWarnings).value
-            if (errorWarts.isEmpty && warningWarts.isEmpty) {
+            val errorWartNames = (x / wartremoverInspect / wartremoverErrors).value
+            val warningWartNames = (x / wartremoverInspect / wartremoverWarnings).value
+            if (errorWartNames.isEmpty && warningWartNames.isEmpty) {
               skipLog("warts is empty")
             } else {
               val tastys = extracted.runTask(myProject / x / tastyFiles, s)._2
@@ -169,26 +171,15 @@ object WartRemover extends sbt.AutoPlugin {
               } else {
                 import scala.language.reflectiveCalls
                 val loader = extracted.runTask(generateProject / Test / testLoader, s)._2
-                val clazz = loader.loadClass("org.wartremover.WartRemoverTastyInspector")
-                val instance = clazz.getConstructor().newInstance()
-                val method = instance.asInstanceOf[
-                  {
-                    def run(
-                      tastyFiles: Array[String],
-                      dependenciesClasspath: Array[String],
-                      wartClasspath: Array[URL],
-                      errorWarts: Array[String],
-                      warningWarts: Array[String]
-                    ): Int
-                  }
-                ]
+                val clazz = loader.loadClass("org.wartremover.WartRemoverInspector")
+                val instance = clazz.getConstructor().newInstance().asInstanceOf[org.wartremover.WartInspector]
                 log.info(
-                  s"running ${myProject.project}/${x.name}/${wartremoverInspect.key.label}. errorWarts = ${errorWarts}, warningWarts = ${warningWarts}"
+                  s"running ${myProject.project}/${x.name}/${wartremoverInspect.key.label}. errorWarts = ${errorWartNames}, warningWarts = ${warningWartNames}"
                 )
-                val errorCount = method.run(
-                  tastyFiles = tastys.map(_.getAbsolutePath).toArray,
-                  dependenciesClasspath = (x / fullClasspath).value.map(_.data.getAbsolutePath).toArray,
-                  wartClasspath = {
+                val result = instance.run(new org.wartremover.InspectParam {
+                  override val tastyFiles = tastys.map(_.getAbsolutePath).toArray
+                  override val dependenciesClasspath = (x / fullClasspath).value.map(_.data.getAbsolutePath).toArray
+                  override val wartClasspath = {
                     extracted
                       .runTask(myProject / x / wartremoverClasspaths, s)
                       ._2
@@ -199,11 +190,12 @@ object WartRemover extends sbt.AutoPlugin {
                           new URL(a)
                       }
                       .toArray
-                  },
-                  errorWarts = errorWarts.map(_.clazz).toArray,
-                  warningWarts = warningWarts.map(_.clazz).toArray
-                )
-                if (errorCount != 0 && (x / wartremoverInspectFailOnErrors).value) {
+                  }
+                  override val errorWarts = errorWartNames.map(_.clazz).toArray
+                  override val warningWarts = warningWartNames.map(_.clazz).toArray
+                  override val failIfWartLoadError = (x / wartremoverFailIfWartLoadError).value
+                })
+                if (result.errors.nonEmpty && (x / wartremoverInspectFailOnErrors).value) {
                   sys.error(s"[${myProject.project}] wart error found")
                 } else {
                   log.info(

@@ -206,6 +206,17 @@ lazy val coreCrossBinary = Project(
   crossVersion := CrossVersion.binary
 ).dependsOn(testMacros % "test->compile")
 
+lazy val inspectorInterface = Project(
+  id = "inspector-interface",
+  base = file("inspector-interface")
+).settings(
+  commonSettings,
+  name := "wartremover-inspector-interface",
+  Compile / compile / javacOptions ++= Seq("-source", "1.8", "-target", "1.8"),
+  crossPaths := false,
+  autoScalaLibrary := false,
+)
+
 lazy val inspector = Project(
   id = "inspector",
   base = file("inspector")
@@ -223,7 +234,10 @@ lazy val inspector = Project(
       Nil
     }
   }
-).dependsOn(coreCrossBinary)
+).dependsOn(
+  coreCrossBinary,
+  inspectorInterface,
+)
 
 lazy val core = Project(
   id = coreId,
@@ -338,6 +352,7 @@ lazy val sbtPlug: Project = Project(
     Seq(file)
   }
 ).enablePlugins(ScriptedPlugin)
+  .dependsOn(inspectorInterface)
 
 lazy val testMacros: Project = Project(
   id = "test-macros",
