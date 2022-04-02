@@ -18,7 +18,7 @@ object WartRemover extends sbt.AutoPlugin {
   object autoImport {
     val wartremoverFailIfWartLoadError = settingKey[Boolean]("")
     val wartremoverInspect = taskKey[InspectResult]("run wartremover by TASTy inspector")
-    val wartremoverInspectFile = settingKey[File]("")
+    val wartremoverInspectFile = settingKey[Option[File]]("")
     val wartremoverInspectOutputStandardReporter = settingKey[Boolean]("")
     val wartremoverInspectFailOnErrors = settingKey[Boolean]("")
     val wartremoverInspectScalaVersion = settingKey[String]("scala version for wartremoverInspect task")
@@ -207,7 +207,7 @@ object WartRemover extends sbt.AutoPlugin {
       val log = streams.value.log
       val myProject = thisProjectRef.value
       val thisTaskName = s"${myProject.project}/${x.id}/${wartremoverInspect.key.label}"
-      def skipLog(reason: String) = Def.task {
+      def skipLog(reason: String) = {
         log.info(s"skip ${thisTaskName} because ${reason}")
         InspectResult.empty
       }
@@ -215,89 +215,88 @@ object WartRemover extends sbt.AutoPlugin {
         val errorWartNames = (x / wartremoverInspect / wartremoverErrors).value
         val warningWartNames = (x / wartremoverInspect / wartremoverWarnings).value
         if (errorWartNames.isEmpty && warningWartNames.isEmpty) {
-          skipLog("warts is empty")
+          Def.task(skipLog("warts is empty"))
         } else {
-          Def.taskDyn {
-            val tastys = (x / tastyFiles).value
-            if (tastys.isEmpty) {
+          Def.taskIf {
+            if ((x / tastyFiles).value.isEmpty) {
               skipLog(s"${tastyFiles.key.label} is empty")
             } else {
-              Def.task {
-                import scala.language.reflectiveCalls
-                val loader = (generateProject / Test / testLoader).value
-                val clazz = loader.loadClass("org.wartremover.WartRemoverInspector")
-                val instance =
-                  clazz.getConstructor().newInstance().asInstanceOf[{ def runFromJson(json: String): String }]
+              import scala.language.reflectiveCalls
+              val loader = (generateProject / Test / testLoader).value
+              val clazz = loader.loadClass("org.wartremover.WartRemoverInspector")
+              val instance =
+                clazz.getConstructor().newInstance().asInstanceOf[{ def runFromJson(json: String): String }]
 
-                val dependenciesClasspath = (x / fullClasspath).value
+              val dependenciesClasspath = (x / fullClasspath).value
 
-                val logStr = {
-                  def names(xs: Seq[Wart]): List[String] = {
-                    xs.map(_.clazz)
-                      .distinct
-                      .groupBy(a => a.split('.').lastOption.getOrElse(a))
-                      .flatMap {
-                        case (k, v) if v.size == 1 => k :: Nil
-                        case (_, v) => v
-                      }
-                      .toList
-                      .sorted
-                  }
-
-                  List(
-                    if (errorWartNames.nonEmpty) {
-                      names(errorWartNames).mkString("errorWarts = [", ", ", "].")
-                    } else {
-                      ""
-                    },
-                    if (warningWartNames.nonEmpty) {
-                      names(warningWartNames).mkString("warningWarts = [", ", ", "]")
-                    } else {
-                      ""
+              val logStr = {
+                def names(xs: Seq[Wart]): List[String] = {
+                  xs.map(_.clazz)
+                    .distinct
+                    .groupBy(a => a.split('.').lastOption.getOrElse(a))
+                    .flatMap {
+                      case (k, v) if v.size == 1 => k :: Nil
+                      case (_, v) => v
                     }
-                  ).mkString(" ")
+                    .toList
+                    .sorted
                 }
-                log.info(s"running ${thisTaskName}. ${logStr}")
-                val param = org.wartremover.InspectParam(
-                  tastyFiles = tastys.map(_.getAbsolutePath).toList,
-                  dependenciesClasspath = dependenciesClasspath.map(_.data.getAbsolutePath).toList,
-                  wartClasspath = {
-                    val filePrefix = "file:"
-                    (x / wartremoverClasspaths).value.map {
-                      case a if a.startsWith(filePrefix) =>
-                        file(a.drop(filePrefix.length)).getCanonicalFile.toURI.toURL
-                      case a =>
-                        new URL(a)
-                    }.map(_.toString)
-                  }.toList,
-                  errorWarts = errorWartNames.map(_.clazz).toList,
-                  warningWarts = warningWartNames.map(_.clazz).toList,
-                  failIfWartLoadError = (x / wartremoverFailIfWartLoadError).value,
-                  outputStandardReporter = (x / wartremoverInspectOutputStandardReporter).value
-                )
-                val resultJson = instance.runFromJson(param.toJsonString)
-                val result = {
-                  val r = resultJson.decodeFromJsonString[InspectResult]
-                  new InspectResult(errors = r.errors, warnings = r.warnings) {
-                    override def toString: String = resultJson
+
+                List(
+                  if (errorWartNames.nonEmpty) {
+                    names(errorWartNames).mkString("errorWarts = [", ", ", "].")
+                  } else {
+                    ""
+                  },
+                  if (warningWartNames.nonEmpty) {
+                    names(warningWartNames).mkString("warningWarts = [", ", ", "]")
+                  } else {
+                    ""
                   }
+                ).mkString(" ")
+              }
+              log.info(s"running ${thisTaskName}. ${logStr}")
+              val param = org.wartremover.InspectParam(
+                tastyFiles = (x / tastyFiles).value.map(_.getAbsolutePath).toList,
+                dependenciesClasspath = dependenciesClasspath.map(_.data.getAbsolutePath).toList,
+                wartClasspath = {
+                  val filePrefix = "file:"
+                  (x / wartremoverClasspaths).value.map {
+                    case a if a.startsWith(filePrefix) =>
+                      file(a.drop(filePrefix.length)).getCanonicalFile.toURI.toURL
+                    case a =>
+                      new URL(a)
+                  }.map(_.toString)
+                }.toList,
+                errorWarts = errorWartNames.map(_.clazz).toList,
+                warningWarts = warningWartNames.map(_.clazz).toList,
+                failIfWartLoadError = (x / wartremoverFailIfWartLoadError).value,
+                outputStandardReporter = (x / wartremoverInspectOutputStandardReporter).value
+              )
+              val resultJson = instance.runFromJson(param.toJsonString)
+              val result = {
+                val r = resultJson.decodeFromJsonString[InspectResult]
+                new InspectResult(errors = r.errors, warnings = r.warnings) {
+                  override def toString: String = resultJson
                 }
-                (x / wartremoverInspectFile).?.value.foreach { outFile =>
-                  log.info(s"[${thisProjectRef.value.project}] write result to ${outFile}")
-                  IO.write(outFile, resultJson)
-                }
-                if (result.errors.nonEmpty && (x / wartremoverInspectFailOnErrors).value) {
-                  sys.error(s"[${thisProjectRef.value.project}] wart error found")
-                } else {
-                  log.info(s"finished ${thisTaskName}")
-                  result
-                }
+              }
+              (x / wartremoverInspectFile).value.foreach { outFile =>
+                log.info(s"[${thisProjectRef.value.project}] write result to ${outFile}")
+                IO.write(outFile, resultJson)
+              }
+              if (result.errors.nonEmpty && (x / wartremoverInspectFailOnErrors).value) {
+                sys.error(s"[${thisProjectRef.value.project}] wart error found")
+              } else {
+                log.info(s"finished ${thisTaskName}")
+                result
               }
             }
           }
         }
       } else {
-        skipLog(s"scalaVersion is ${scalaVersion.value}. not Scala 3")
+        Def.task(
+          skipLog(s"scalaVersion is ${scalaVersion.value}. not Scala 3")
+        )
       }
     }.value
   }

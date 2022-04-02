@@ -1,5 +1,7 @@
 > show wartremoverInspect
 $ must-mirror warts-main.json check1.json
+$ exists target/scala-3.1.2/classes
+-$ exists target/scala-3.1.2/test-classes
 
 > set Compile / wartremoverInspect / wartremoverWarnings := Nil
 > set Compile / wartremoverInspect / wartremoverErrors := Warts.all
