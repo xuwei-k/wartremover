@@ -222,7 +222,7 @@ object WartRemover extends sbt.AutoPlugin {
             if (tastys.isEmpty) {
               skipLog(s"${tastyFiles.key.label} is empty")
             } else {
-              Def.taskDyn {
+              Def.task {
                 import scala.language.reflectiveCalls
                 val loader = (generateProject / Test / testLoader).value
                 val clazz = loader.loadClass("org.wartremover.WartRemoverInspector")
@@ -290,7 +290,7 @@ object WartRemover extends sbt.AutoPlugin {
                   sys.error(s"[${thisProjectRef.value.project}] wart error found")
                 } else {
                   log.info(s"finished ${thisTaskName}")
-                  Def.task(result)
+                  result
                 }
               }
             }
