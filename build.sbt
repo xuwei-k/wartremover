@@ -28,8 +28,9 @@ addCommandAlias(
   List(
     "scalafmtAll",
     s"++ ${latestScala3}!",
-    "all core-cross-binary/publishLocal inspector/publishLocal",
+    "all core-cross-binary/publishLocal inspector/publishLocal inspector-interface/publishLocal",
     s"++ ${latestScala212}!",
+    "inspector-interface/publishLocal",
     "sbt-plugin/scripted wartremover/inspector",
   ).mkString(";")
 )

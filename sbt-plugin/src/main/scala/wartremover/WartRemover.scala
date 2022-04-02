@@ -147,7 +147,7 @@ object WartRemover extends sbt.AutoPlugin {
     import sjsonnew.BasicJsonProtocol.*
     caseClass6(InspectParam, InspectParam.unapply)(
       "tastyFiles",
-      "dependencyClasspath",
+      "dependenciesClasspath",
       "wartClasspath",
       "errorWarts",
       "warningWarts",
@@ -202,6 +202,7 @@ object WartRemover extends sbt.AutoPlugin {
   private[this] implicit class JsonStringOps(private val string: String) extends AnyVal {
     def decodeFromJsonString[A](implicit r: sjsonnew.JsonReader[A]): A = {
       val json = sjsonnew.support.scalajson.unsafe.Parser.parseUnsafe(string)
+      println(json)
       val unbuilder = new sjsonnew.Unbuilder(sjsonnew.support.scalajson.unsafe.Converter.facade)
       r.read(Some(json), unbuilder)
     }

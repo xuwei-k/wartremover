@@ -15,10 +15,10 @@ import scala.util.control.NonFatal
 import java.net.URL
 
 class WartRemoverInspector {
-  private[this] implicit val positionInstance: EncodeJson[Position] =
-    EncodeJson.derive[Position]
   private[this] implicit val sourceFileInstance: EncodeJson[SourceFile] =
     EncodeJson.derive[SourceFile]
+  private[this] implicit val positionInstance: EncodeJson[Position] =
+    EncodeJson.derive[Position]
   private[this] implicit val diagnosticInstance: EncodeJson[Diagnostic] =
     EncodeJson.derive[Diagnostic]
   private[this] implicit val inspectResultInstance: EncodeJson[InspectResult] =
