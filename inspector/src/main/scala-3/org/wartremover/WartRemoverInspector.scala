@@ -4,8 +4,6 @@ import java.net.URLClassLoader
 import java.nio.file.Path
 import java.util.Optional
 import java.util.concurrent.atomic.AtomicInteger
-import org.wartremover.WartRemoverInspector.*
-import scala.jdk.OptionConverters.*
 import scala.quoted.Quotes
 import scala.reflect.NameTransformer
 import scala.tasty.inspector.Inspector
@@ -14,19 +12,16 @@ import scala.tasty.inspector.TastyInspector
 import scala.util.control.NonFatal
 import java.net.URL
 
-object WartRemoverInspector {
-}
+class WartRemoverInspector {
 
-class WartRemoverInspector extends WartInspector {
-
-  override def run(param: InspectParam): InspectResult = {
+  def run(param: InspectParam): InspectResult = {
     println("dependenciesClasspath = " + param.dependenciesClasspath.toList)
     println("wartClasspath = " + param.wartClasspath.toList)
     if (param.tastyFiles.isEmpty) {
       println("tastyFiles is empty")
-      InspectResult.empty()
+      InspectResult.empty
     } else {
-      val classLoader = new URLClassLoader(param.wartClasspath, getClass.getClassLoader)
+      val classLoader = new URLClassLoader(param.wartClasspath.map(new URL(_)).toArray, getClass.getClassLoader)
       val (errorLoadFail, errorTraversers) = param.errorWarts.toList.partitionMap(Plugin.loadWart(_, classLoader))
       val (warnLoadFail, warningTraversers) = param.warningWarts.toList.partitionMap(Plugin.loadWart(_, classLoader))
       val loadFailed = errorLoadFail ++ warnLoadFail
@@ -39,7 +34,7 @@ class WartRemoverInspector extends WartInspector {
       }
       if (errorTraversers.isEmpty && warningTraversers.isEmpty) {
         println("warts is empty")
-        InspectResult.empty()
+        InspectResult.empty
       } else {
         runImpl(
           errorTraversers = errorTraversers,
@@ -57,26 +52,26 @@ class WartRemoverInspector extends WartInspector {
     tastyFiles: List[String],
     dependenciesClasspath: List[String],
   ): InspectResult = {
-    val errors, warnings = Array.newBuilder[WartDiagnostic]
+    val errors, warnings = List.newBuilder[Diagnostic]
 
     val inspector = new Inspector {
       def inspect(using q: Quotes)(tastys: List[Tasty[q.type]]): Unit = {
         import q.reflect.*
         def convertPos(p: Position): org.wartremover.Position = {
-          SourcePos(
+          org.wartremover.Position(
             start = p.start,
             startLine = p.startLine,
             startColumn = p.startColumn,
             end = p.end,
             endLine = p.endLine,
             endColumn = p.endColumn,
-            sourceFile = SrcFile(
-              pathOpt = p.sourceFile.getJPath,
+            sourceFile = org.wartremover.SourceFile(
+              jpath = p.sourceFile.getJPath,
               name = p.sourceFile.name,
               path = p.sourceFile.path,
-              contentOpt = p.sourceFile.content,
+              content = p.sourceFile.content,
             ),
-            sourceCodeOpt = p.sourceCode,
+            sourceCode = p.sourceCode,
           )
         }
 
@@ -86,14 +81,14 @@ class WartRemoverInspector extends WartInspector {
               override type Q = q.type
               override val quotes: q.type = q
               override def onError(msg: String, pos: Position): Unit = {
-                errors += WartDiagnosticImpl(
+                errors += Diagnostic(
                   message = msg,
                   position = convertPos(pos),
                 )
                 super.onError(msg = msg, pos = pos)
               }
               override def onWarn(msg: String, pos: Position): Unit = {
-                warnings += WartDiagnosticImpl(
+                warnings += Diagnostic(
                   message = msg,
                   position = convertPos(pos),
                 )
@@ -118,7 +113,7 @@ class WartRemoverInspector extends WartInspector {
       dependenciesClasspath = dependenciesClasspath,
     )(inspector)
 
-    WartInspectResult(
+    InspectResult(
       errors = errors.result(),
       warnings = warnings.result()
     )
