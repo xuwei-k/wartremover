@@ -1,5 +1,7 @@
 package org.wartremover
 
+import argonaut.DecodeJson
+import argonaut.EncodeJson
 import java.net.URLClassLoader
 import java.nio.file.Path
 import java.util.Optional
@@ -13,8 +15,33 @@ import scala.util.control.NonFatal
 import java.net.URL
 
 class WartRemoverInspector {
+  private[this] implicit val positionInstance: EncodeJson[Position] =
+    EncodeJson.derive[Position]
+  private[this] implicit val sourceFileInstance: EncodeJson[SourceFile] =
+    EncodeJson.derive[SourceFile]
+  private[this] implicit val diagnosticInstance: EncodeJson[Diagnostic] =
+    EncodeJson.derive[Diagnostic]
+  private[this] implicit val inspectResultInstance: EncodeJson[InspectResult] =
+    EncodeJson.derive[InspectResult]
+  private[this] implicit val inspectParamInstance: DecodeJson[InspectParam] =
+    DecodeJson.derive[InspectParam]
 
-  def run(param: InspectParam): InspectResult = {
+  def run(json: String): String = {
+    val param = argonaut.JsonParser
+      .parse(json)
+      .left
+      .map(sys.error(_))
+      .merge
+      .as[InspectParam]
+      .fold(
+        (e, _) => sys.error(e),
+        identity
+      )
+    val result = run(param)
+    implicitly[EncodeJson[InspectResult]].encode(result).spaces2
+  }
+
+  private[this] def run(param: InspectParam): InspectResult = {
     println("dependenciesClasspath = " + param.dependenciesClasspath.toList)
     println("wartClasspath = " + param.wartClasspath.toList)
     if (param.tastyFiles.isEmpty) {
@@ -66,7 +93,6 @@ class WartRemoverInspector {
             endLine = p.endLine,
             endColumn = p.endColumn,
             sourceFile = org.wartremover.SourceFile(
-              jpath = p.sourceFile.getJPath,
               name = p.sourceFile.name,
               path = p.sourceFile.path,
               content = p.sourceFile.content,

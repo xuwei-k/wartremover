@@ -1,8 +1,8 @@
 package org.wartremover
 
 final case class InspectResult(
-  errors: Seq[Diagnostic],
-  warnings: Seq[Diagnostic],
+  errors: List[Diagnostic],
+  warnings: List[Diagnostic],
 )
 
 object InspectResult {

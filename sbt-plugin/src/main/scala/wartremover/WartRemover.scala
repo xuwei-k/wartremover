@@ -1,13 +1,18 @@
 package wartremover
 
+import org.wartremover.InspectParam
+import org.wartremover.InspectResult
 import java.nio.file.Path
 import java.net.URL
-import sbt._
-import sbt.Keys._
+import sbt.*
+import sbt.Keys.*
 import sbt.internal.librarymanagement.IvySbt
 import sbt.librarymanagement.UnresolvedWarningConfiguration
 import sbt.librarymanagement.UpdateConfiguration
 import sbt.librarymanagement.ivy.IvyDependencyResolution
+import sjsonnew.JsonFormat
+import sjsonnew.JsonReader
+import sjsonnew.support.scalajson.unsafe.CompactPrinter
 
 object WartRemover extends sbt.AutoPlugin {
   override def trigger = allRequirements
@@ -138,6 +143,70 @@ object WartRemover extends sbt.AutoPlugin {
     }
   }
 
+  private[this] implicit val inspectParamFormat: JsonFormat[InspectParam] = {
+    import sjsonnew.BasicJsonProtocol.*
+    caseClass6(InspectParam, InspectParam.unapply)(
+      "tastyFiles",
+      "dependencyClasspath",
+      "wartClasspath",
+      "errorWarts",
+      "warningWarts",
+      "failIfWartLoadError",
+    )
+  }
+
+  private[this] implicit val inspectResultFormat: JsonFormat[InspectResult] = {
+    import sjsonnew.BasicJsonProtocol.*
+
+    implicit val sourceFileInstance: JsonFormat[org.wartremover.SourceFile] =
+      caseClass3(org.wartremover.SourceFile, org.wartremover.SourceFile.unapply)(
+        "name",
+        "path",
+        "content",
+      )
+
+    implicit val positionInstance: JsonFormat[org.wartremover.Position] =
+      caseClass8(org.wartremover.Position, org.wartremover.Position.unapply)(
+        "start",
+        "startLine",
+        "startColumn",
+        "end",
+        "endLine",
+        "endColumn",
+        "sourceFile",
+        "sourceCode",
+      )
+
+    implicit val diagnosticInstance: JsonFormat[org.wartremover.Diagnostic] =
+      caseClass2(org.wartremover.Diagnostic, org.wartremover.Diagnostic.unapply)(
+        "message",
+        "position",
+      )
+
+    caseClass2(InspectResult.apply, InspectResult.unapply)(
+      "errors",
+      "warnings",
+    )
+  }
+
+  private[this] implicit class JsonOps[A](private val self: A) extends AnyVal {
+    def toJsonString(implicit w: sjsonnew.JsonWriter[A]): String = {
+      val builder = new sjsonnew.Builder(sjsonnew.support.scalajson.unsafe.Converter.facade)
+      w.write(self, builder)
+      CompactPrinter.apply(
+        builder.result.getOrElse(sys.error("invalid json"))
+      )
+    }
+  }
+
+  private[this] implicit class JsonStringOps(private val string: String) extends AnyVal {
+    def decodeFromJsonString[A](implicit r: sjsonnew.JsonReader[A]): A = {
+      val json = sjsonnew.support.scalajson.unsafe.Parser.parseUnsafe(string)
+      val unbuilder = new sjsonnew.Unbuilder(sjsonnew.support.scalajson.unsafe.Converter.facade)
+      r.read(Some(json), unbuilder)
+    }
+  }
+
   override lazy val projectSettings: Seq[Def.Setting[_]] = Def.settings(
     libraryDependencies ++= {
       Seq(
@@ -175,7 +244,7 @@ object WartRemover extends sbt.AutoPlugin {
                   .newInstance()
                   .asInstanceOf[
                     {
-                      def run(param: org.wartremover.InspectParam): org.wartremover.InspectResult
+                      def run(json: String): String
                     }
                   ]
 
@@ -183,27 +252,26 @@ object WartRemover extends sbt.AutoPlugin {
                 log.info(
                   s"running ${thisTaskName}. errorWarts = ${errorWartNames}, warningWarts = ${warningWartNames}"
                 )
-                val result = instance.run(
-                  org.wartremover.InspectParam(
-                    tastyFiles = tastys.map(_.getAbsolutePath),
-                    dependenciesClasspath = dependenciesClasspath.map(_.data.getAbsolutePath),
-                    wartClasspath = {
-                      extracted
-                        .runTask(myProject / x / wartremoverClasspaths, s)
-                        ._2
-                        .map {
-                          case a if a.startsWith("file:") =>
-                            file(a.drop("file:".length)).getCanonicalFile.toURI.toURL
-                          case a =>
-                            new URL(a)
-                        }
-                        .map(_.toString) // TODO
-                    },
-                    errorWarts = errorWartNames.map(_.clazz),
-                    warningWarts = warningWartNames.map(_.clazz),
-                    failIfWartLoadError = (x / wartremoverFailIfWartLoadError).value,
-                  )
+                val param = org.wartremover.InspectParam(
+                  tastyFiles = tastys.map(_.getAbsolutePath).toList,
+                  dependenciesClasspath = dependenciesClasspath.map(_.data.getAbsolutePath).toList,
+                  wartClasspath = {
+                    extracted
+                      .runTask(myProject / x / wartremoverClasspaths, s)
+                      ._2
+                      .map {
+                        case a if a.startsWith("file:") =>
+                          file(a.drop("file:".length)).getCanonicalFile.toURI.toURL
+                        case a =>
+                          new URL(a)
+                      }
+                      .map(_.toString) // TODO
+                  }.toList,
+                  errorWarts = errorWartNames.map(_.clazz).toList,
+                  warningWarts = warningWartNames.map(_.clazz).toList,
+                  failIfWartLoadError = (x / wartremoverFailIfWartLoadError).value,
                 )
+                val result = instance.run(param.toJsonString).decodeFromJsonString[InspectResult]
                 if (result.errors.nonEmpty && (x / wartremoverInspectFailOnErrors).value) {
                   sys.error(s"[${myProject.project}] wart error found")
                 } else {
