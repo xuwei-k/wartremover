@@ -9,7 +9,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 import scala.reflect.NameTransformer
 
 object Plugin {
-  private[wartremover] def loadWart(name: String, classLoader: ClassLoader): Either[(String, Throwable), WartTraverser] = {
+  private[wartremover] def loadWart(
+    name: String,
+    classLoader: ClassLoader
+  ): Either[(String, Throwable), WartTraverser] = {
     try {
       val clazz = classLoader.loadClass(name + NameTransformer.MODULE_SUFFIX_STRING)
       val field = clazz.getField(NameTransformer.MODULE_INSTANCE_NAME)
@@ -25,7 +28,6 @@ class Plugin extends StandardPlugin {
   override def name = "wartremover"
 
   override def description = "wartremover"
-
 
   private[this] val initialLog = new AtomicBoolean(true)
 
