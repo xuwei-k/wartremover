@@ -18,6 +18,7 @@ object WartRemover extends sbt.AutoPlugin {
   object autoImport {
     val wartremoverFailIfWartLoadError = settingKey[Boolean]("")
     val wartremoverInspect = taskKey[InspectResult]("run wartremover by TASTy inspector")
+    val wartremoverInspectAll = taskKey[InspectResult]("")
     val wartremoverInspectOutputFile = settingKey[Option[File]]("")
     val wartremoverInspectOutputStandardReporter = settingKey[Boolean]("")
     val wartremoverInspectFailOnErrors = settingKey[Boolean]("")
@@ -34,7 +35,47 @@ object WartRemover extends sbt.AutoPlugin {
   }
   import autoImport._
 
+  private[this] def sequentialAndAggregate[A](
+    tasks: List[Def.Initialize[Task[A]]],
+    acc: List[A]
+  ): Def.Initialize[Task[Seq[A]]] = {
+    tasks match {
+      case Nil =>
+        Def.task {
+          acc
+        }
+      case x :: xs =>
+        Def.taskDyn {
+          sequentialAndAggregate(xs, x.value :: acc)
+        }
+    }
+  }
+
   override def globalSettings = Seq(
+    wartremoverInspectAll := Def.taskDyn {
+      val s = state.value
+      val extracted = Project.extract(s)
+      val currentBuildUri = extracted.currentRef.build
+      val buildStructure = extracted.structure
+      val buildUnitsMap = buildStructure.units
+      val currentBuildUnit = buildUnitsMap(currentBuildUri)
+      val projectsMap = currentBuildUnit.defined
+
+      implicit class ResultsOps(values: Seq[InspectResult]) {
+        def merge: InspectResult = {
+          values.foldLeft(InspectResult.empty) { case (a, b) =>
+            InspectResult(
+              errors = a.errors ++ b.errors,
+              warnings = a.warnings ++ b.warnings,
+            )
+          }
+        }
+      }
+      sequentialAndAggregate(
+        projectsMap.keys.toList.map(p => LocalProject(p) / wartremoverInspect).grouped(2).toList.map(_.join),
+        Nil
+      ).map(_.flatten.merge)
+    }.value,
     wartremoverInspectScalaVersion := {
       // need NIGHTLY version because there are some bugs in old tasty-inspector.
       "3.1.3-RC1-bin-20220401-4a96ce7-NIGHTLY"
@@ -147,12 +188,13 @@ object WartRemover extends sbt.AutoPlugin {
 
   private[this] implicit val inspectParamFormat: JsonFormat[InspectParam] = {
     import sjsonnew.BasicJsonProtocol.*
-    caseClass7(InspectParam, InspectParam.unapply)(
+    caseClass8(InspectParam, InspectParam.unapply)(
       "tastyFiles",
       "dependenciesClasspath",
       "wartClasspath",
       "errorWarts",
       "warningWarts",
+      "exclude",
       "failIfWartLoadError",
       "outputStandardReporter",
     )
@@ -272,6 +314,10 @@ object WartRemover extends sbt.AutoPlugin {
                 }.toList,
                 errorWarts = errorWartNames.map(_.clazz).toList,
                 warningWarts = warningWartNames.map(_.clazz).toList,
+                exclude = wartremoverExcluded.value.distinct.flatMap { c =>
+                  val base = (LocalRootProject / baseDirectory).value
+                  IO.relativize(base, c)
+                }.toList,
                 failIfWartLoadError = (x / wartremoverFailIfWartLoadError).value,
                 outputStandardReporter = (x / wartremoverInspectOutputStandardReporter).value
               )
