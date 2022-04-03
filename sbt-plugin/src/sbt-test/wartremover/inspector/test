@@ -13,6 +13,7 @@ $ must-mirror warts-main.json check2.json
 -$ exists warts-test.json
 > show Test/wartremoverInspect
 $ must-mirror warts-test.json check3.json
+$ exists target/scala-3.1.2/test-classes
 
 # test wartremoverFailIfWartLoadError
 > set Compile / wartremoverInspect / wartremoverWarnings := Warts.all

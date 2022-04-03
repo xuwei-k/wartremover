@@ -6,8 +6,9 @@ import tools.nsc.Phase
 import java.io.File
 import java.net.URL
 import java.net.URLClassLoader
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext
 import scala.reflect.internal.util.NoPosition
-import scala.reflect.internal.util.Position
 import scala.util.control.NonFatal
 
 class Plugin(val global: Global) extends tools.nsc.plugins.Plugin {
@@ -20,6 +21,7 @@ class Plugin(val global: Global) extends tools.nsc.plugins.Plugin {
   private[this] var onlyWarnTraversers: List[WartTraverser] = List.empty
   private[this] var excludedFiles: List[String] = List.empty
   private[this] var logLevel: LogLevel = LogLevel.Disable
+  private[this] var parallel: Boolean = false
 
   def getTraverser(mirror: reflect.runtime.universe.Mirror)(name: String): WartTraverser = {
     val moduleSymbol = mirror.staticModule(name)
@@ -59,22 +61,25 @@ class Plugin(val global: Global) extends tools.nsc.plugins.Plugin {
           success += getTraverser(mirror)(name)
         } catch {
           case NonFatal(e) =>
-            if (errorIfLoadError) {
-              throw e
-            } else {
-              failure += ((name, e))
-            }
+            failure += ((name, e))
         }
       }
       val loadFail = failure.result()
       if (loadFail.nonEmpty) {
         global.reporter.warning(NoPosition, loadFail.mkString("load failure warts = ", ", ", ""))
+        if (errorIfLoadError) {
+          throw loadFail.head._2
+        }
       }
       success.result()
     }
 
     filterOptions("loglevel", options).flatMap(LogLevel.map.get).headOption.foreach { loglevel =>
       this.logLevel = loglevel
+    }
+
+    if (options.contains("concurrency:parallel")) {
+      parallel = true
     }
 
     traversers = ts("traverser")
@@ -132,7 +137,7 @@ class Plugin(val global: Global) extends tools.nsc.plugins.Plugin {
             override val logLevel: LogLevel = Plugin.this.logLevel
           }
 
-          def go(ts: List[WartTraverser], onlyWarn: Boolean) = {
+          def go(ts: List[WartTraverser], onlyWarn: Boolean): Unit = {
             ts.foreach { traverser =>
               try {
                 traverser.apply(wartUniverse(onlyWarn)).traverse(unit.body)
@@ -150,8 +155,15 @@ class Plugin(val global: Global) extends tools.nsc.plugins.Plugin {
               global.reporter.echo(s"run wartremover ${unit.source.path}")
             case _ =>
           }
-          go(traversers, onlyWarn = false)
-          go(onlyWarnTraversers, onlyWarn = true)
+          def run(): Unit = {
+            go(traversers, onlyWarn = false)
+            go(onlyWarnTraversers, onlyWarn = true)
+          }
+          if (parallel) {
+            Future(run())(ExecutionContext.global)
+          } else {
+            run()
+          }
         }
       }
     }
