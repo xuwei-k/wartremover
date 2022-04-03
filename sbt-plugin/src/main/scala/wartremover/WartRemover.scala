@@ -362,6 +362,15 @@ object WartRemover extends sbt.AutoPlugin {
         },
         derive(
           scalacOptions ++= {
+            if (wartremoverFailIfWartLoadError.value) {
+              Seq(s"-P:wartremover:on-wart-load-error:failure")
+            } else {
+              Nil
+            }
+          }
+        ),
+        derive(
+          scalacOptions ++= {
             wartremoverErrors.value.distinct map (w => s"-P:wartremover:traverser:${w.clazz}")
           }
         ),
