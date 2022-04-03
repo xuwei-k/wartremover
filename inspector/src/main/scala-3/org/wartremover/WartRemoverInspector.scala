@@ -143,7 +143,7 @@ final class WartRemoverInspector {
 
     implicit val ord: Ordering[Diagnostic] = Ordering.by { a =>
       val p = a.position
-      (p.path, p.start, a.message)
+      (p.path, p.start, p.end, a.message)
     }
 
     InspectResult(
