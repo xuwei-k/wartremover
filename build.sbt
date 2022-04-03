@@ -235,11 +235,11 @@ lazy val inspector = Project(
   commonSettings,
   name := "wartremover-inspector",
   crossScalaVersions := Seq(latestScala3),
-  libraryDependencies += "io.argonaut" %% "argonaut" % "6.3.8",
   publish / skip := (scalaBinaryVersion.value != "3"),
   libraryDependencies ++= {
     if (scalaBinaryVersion.value == "3") {
       Seq(
+        "io.argonaut" %% "argonaut" % "6.3.8",
         "org.scala-lang" %% "scala3-tasty-inspector" % scalaVersion.value % Provided,
       )
     } else {
