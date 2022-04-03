@@ -204,6 +204,7 @@ object WartRemover extends sbt.AutoPlugin {
   }
 
   private[this] def inspectTask(x: Configuration): Def.Setting[Task[InspectResult]] = {
+    x / wartremoverInspectOutputFile := None,
     x / wartremoverInspect := Def.taskDyn {
       val log = streams.value.log
       val myProject = thisProjectRef.value
@@ -281,7 +282,7 @@ object WartRemover extends sbt.AutoPlugin {
                   override def toString: String = resultJson
                 }
               }
-              (x / wartremoverInspectOutputFile).value.foreach { outFile =>
+              (x / wartremoverInspectOutputFile).?.value.flatten.foreach { outFile =>
                 log.info(s"[${thisProjectRef.value.project}] write result to ${outFile}")
                 IO.write(outFile, resultJson)
               }
