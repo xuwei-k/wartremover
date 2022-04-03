@@ -31,3 +31,5 @@ $ exists target/scala-3.1.2/test-classes
 -> show Compile/wartremoverInspect
 > set wartremoverInspectFailOnErrors := false
 > show Compile/wartremoverInspect
+
+> wartremoverInspectAll

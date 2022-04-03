@@ -4,6 +4,7 @@ import org.wartremover.InspectParam
 import org.wartremover.InspectResult
 import java.nio.file.Path
 import java.net.URL
+import sbt.LocalProject
 import sbt.*
 import sbt.Keys.*
 import sbt.internal.librarymanagement.IvySbt
@@ -38,7 +39,7 @@ object WartRemover extends sbt.AutoPlugin {
   private[this] def sequentialAndAggregate[A](
     tasks: List[Def.Initialize[Task[A]]],
     acc: List[A]
-  ): Def.Initialize[Task[Seq[A]]] = {
+  ): Def.Initialize[Task[List[A]]] = {
     tasks match {
       case Nil =>
         Def.task {
@@ -51,7 +52,7 @@ object WartRemover extends sbt.AutoPlugin {
     }
   }
 
-  override def globalSettings = Seq(
+  override def buildSettings = Seq(
     wartremoverInspectAll := Def.taskDyn {
       val s = state.value
       val extracted = Project.extract(s)
@@ -59,7 +60,8 @@ object WartRemover extends sbt.AutoPlugin {
       val buildStructure = extracted.structure
       val buildUnitsMap = buildStructure.units
       val currentBuildUnit = buildUnitsMap(currentBuildUri)
-      val projectsMap = currentBuildUnit.defined
+      val root = extracted.rootProject(currentBuildUri)
+      val allProjects = currentBuildUnit.defined.keys.filter(_ != root).toList
 
       implicit class ResultsOps(values: Seq[InspectResult]) {
         def merge: InspectResult = {
@@ -72,10 +74,18 @@ object WartRemover extends sbt.AutoPlugin {
         }
       }
       sequentialAndAggregate(
-        projectsMap.keys.toList.map(p => LocalProject(p) / wartremoverInspect).grouped(2).toList.map(_.join),
+        allProjects.map(p =>
+          Seq(
+            LocalProject(p) / Compile / wartremoverInspect,
+            LocalProject(p) / Test / wartremoverInspect,
+          ).join
+        ),
         Nil
       ).map(_.flatten.merge)
     }.value,
+  )
+
+  override def globalSettings = Seq(
     wartremoverInspectScalaVersion := {
       // need NIGHTLY version because there are some bugs in old tasty-inspector.
       "3.1.3-RC1-bin-20220401-4a96ce7-NIGHTLY"
