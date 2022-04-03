@@ -203,7 +203,7 @@ object WartRemover extends sbt.AutoPlugin {
     }
   }
 
-  private[this] def inspectTask(x: Configuration): Def.Setting[Task[InspectResult]] = {
+  private[this] def inspectTask(x: Configuration): Seq[Def.Setting[?]] = Def.settings(
     x / wartremoverInspectOutputFile := None,
     x / wartremoverInspect := Def.taskDyn {
       val log = streams.value.log
@@ -301,7 +301,7 @@ object WartRemover extends sbt.AutoPlugin {
         )
       }
     }.value
-  }
+  )
 
   override lazy val projectSettings: Seq[Def.Setting[_]] = Def.settings(
     libraryDependencies ++= {
@@ -314,9 +314,7 @@ object WartRemover extends sbt.AutoPlugin {
     wartremoverFailIfWartLoadError := false,
     wartremoverInspectFailOnErrors := true,
     wartremoverInspectOutputStandardReporter := true,
-    Seq(Compile, Test).map { x =>
-      inspectTask(x)
-    },
+    Seq(Compile, Test).flatMap(inspectTask),
     scalacOptionSetting(scalacOptions),
     scalacOptionSetting(Compile / scalacOptions),
     scalacOptionSetting(Test / scalacOptions),
