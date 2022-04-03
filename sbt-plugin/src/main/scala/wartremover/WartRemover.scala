@@ -226,8 +226,9 @@ object WartRemover extends sbt.AutoPlugin {
       )
 
     implicit val diagnosticInstance: JsonFormat[org.wartremover.Diagnostic] =
-      caseClass2(org.wartremover.Diagnostic, org.wartremover.Diagnostic.unapply)(
+      caseClass3(org.wartremover.Diagnostic, org.wartremover.Diagnostic.unapply)(
         "message",
+        "wart",
         "position",
       )
 

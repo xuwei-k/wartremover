@@ -47,10 +47,9 @@ final class WartRemoverInspector {
       val (warnLoadFail, warningTraversers) = param.warningWarts.toList.partitionMap(Plugin.loadWart(_, classLoader))
       val loadFailed = errorLoadFail ++ warnLoadFail
       if (loadFailed.nonEmpty) {
+        println("load fail warts = " + loadFailed.mkString(", "))
         if (param.failIfWartLoadError) {
           throw loadFailed.head._2
-        } else {
-          println("load fail warts = " + loadFailed.map(_._1).mkString(", "))
         }
       }
       if (errorTraversers.isEmpty && warningTraversers.isEmpty) {
@@ -103,6 +102,7 @@ final class WartRemoverInspector {
               override def onError(msg: String, pos: Position): Unit = {
                 errors += Diagnostic(
                   message = msg,
+                  wart = traverser.fullName,
                   position = convertPos(pos),
                 )
                 if (outputReporter) {
@@ -112,6 +112,7 @@ final class WartRemoverInspector {
               override def onWarn(msg: String, pos: Position): Unit = {
                 warnings += Diagnostic(
                   message = msg,
+                  wart = traverser.fullName,
                   position = convertPos(pos),
                 )
                 if (outputReporter) {

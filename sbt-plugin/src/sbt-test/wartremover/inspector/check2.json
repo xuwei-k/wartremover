@@ -2,6 +2,7 @@
   "errors" : [
     {
       "message" : "[wartremover:ScalaApp] Don't use scala.App. https://docs.scala-lang.org/scala3/book/methods-main-methods.html",
+      "wart" : "org.wartremover.warts.ScalaApp",
       "position" : {
         "startLine" : 2,
         "path" : "src/main/scala/Main.scala",
@@ -15,6 +16,7 @@
     },
     {
       "message" : "[wartremover:Null] null is disabled",
+      "wart" : "org.wartremover.warts.Null",
       "position" : {
         "startLine" : 3,
         "path" : "src/main/scala/Main.scala",
