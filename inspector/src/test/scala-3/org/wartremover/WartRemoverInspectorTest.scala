@@ -1,5 +1,6 @@
 package org.wartremover
 
+import java.io.File
 import org.scalatest.funsuite.AnyFunSuite
 import sbt.io.IO
 import scala.quoted.Quotes
@@ -81,33 +82,61 @@ class WartRemoverInspectorTest extends AnyFunSuite {
     "While",
   ).map(packagePrefix + _)
 
-  private def inspectLibrary(module: coursier.core.Dependency): Map[String, Map[String, Int]] = {
+  private def inspectLibrary(
+    module: coursier.core.Dependency,
+    filter: File => Boolean
+  ): Map[String, Map[String, Int]] = {
     val jars = coursier.Fetch().addDependencies(module).run()
-    jars.map { jar =>
-      println("start " + jar)
-      val result = IO.withTemporaryDirectory { dir =>
-        val tastyFiles = IO.unzip(jar, dir, _ endsWith ".tasty").map(_.getAbsolutePath).toList
-        println("tasty files count = " + tastyFiles.size)
-        val param = InspectParam(
-          tastyFiles = tastyFiles,
-          dependenciesClasspath = jars.map(_.getAbsolutePath).toList,
-          wartClasspath = Nil,
-          errorWarts = Nil,
-          warningWarts = allWarts,
-          exclude = Nil,
-          failIfWartLoadError = true,
-          outputStandardReporter = true
-        )
-        inspector.run(param)
+    jars
+      .filter(filter)
+      .map { jar =>
+        println("start " + jar)
+        val result = IO.withTemporaryDirectory { dir =>
+          val tastyFiles = IO.unzip(jar, dir, _ endsWith ".tasty").map(_.getAbsolutePath).toList
+          println("tasty files count = " + tastyFiles.size)
+          val param = InspectParam(
+            tastyFiles = tastyFiles,
+            dependenciesClasspath = jars.map(_.getAbsolutePath).toList,
+            wartClasspath = Nil,
+            errorWarts = Nil,
+            warningWarts = allWarts,
+            exclude = Nil,
+            failIfWartLoadError = true,
+            outputStandardReporter = true
+          )
+          inspector.run(param)
+        }
+        jar.getName -> result.warnings.map(_.wart.replace(packagePrefix, "")).groupBy(identity).map { case (k, v) =>
+          k -> v.size
+        }
       }
-      jar.getName -> result.warnings.map(_.wart.replace(packagePrefix, "")).groupBy(identity).map { case (k, v) =>
-        k -> v.size
-      }
-    }.toMap
+      .toMap
+  }
+
+  Seq("deriving", "test", "typeable").foreach { x =>
+    val name = "shapeless3-" + x
+    test(name) {
+      val result = inspectLibrary(
+        "org.typelevel" %% name % "3.0.4",
+        _.getName contains name,
+      )
+      println(result)
+    }
+  }
+
+  test("scala3-compiler") {
+    val result = inspectLibrary(
+      "org.scala-lang" %% "scala3-compiler" % "3.1.2",
+      _.getName contains "scala3-compiler",
+    )
+    println(result)
   }
 
   test("cats") {
-    val result = inspectLibrary("org.typelevel" %% "cats-core" % "2.7.0")
+    val result = inspectLibrary(
+      "org.typelevel" %% "cats-core" % "2.7.0",
+      Function.const(true),
+    )
     assert(
       result("cats-kernel_3-2.7.0.jar") === Map(
         ("Equals", 54),
