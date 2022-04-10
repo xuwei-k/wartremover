@@ -5,6 +5,13 @@ import org.wartremover.warts.RedundantConversions
 import org.scalatest.funsuite.AnyFunSuite
 
 class RedundantConversionsTest extends AnyFunSuite with ResultAssertions {
+  test("redundant asInstanceOf disabled") {
+    val result = WartTestTraverser(RedundantConversions) {
+      def int: Int = ???
+      int.asInstanceOf[Int]
+    }
+    assertError(result)("redundant asInstanceOf conversion")
+  }
   test("redundant toInt disabled") {
     val result = WartTestTraverser(RedundantConversions) {
       def int: Int = ???
