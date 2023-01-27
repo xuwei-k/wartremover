@@ -5,7 +5,7 @@ import org.wartremover.warts.Matchable
 import org.scalatest.funsuite.AnyFunSuite
 import org.mockito.Mockito
 
-class MatchableTest extends AnyFunSuite with ResultAssertions {
+class MatchableTest extends AnyFunSuite with ResultAssertions    {
   test("Matchable can't be inferred") {
     val result = WartTestTraverser(Matchable) {
       List("a", true)

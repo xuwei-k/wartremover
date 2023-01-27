@@ -1,7 +1,7 @@
 import ReleaseTransformations._
 import com.jsuereth.sbtpgp.PgpKeys
 import xsbti.api.ClassLike
-import xsbti.api.DefinitionType
+   import xsbti.api.DefinitionType
 import scala.reflect.NameTransformer
 import java.lang.reflect.Modifier
 

@@ -9,7 +9,7 @@ import tools.nsc.reporters.Reporter
 object Main {
   case class WartArgs(traversers: List[String], names: List[String], scalacArgs: List[String]) {
     def append(o: WartArgs) = WartArgs(traversers ++ o.traversers, names ++ o.names, scalacArgs ++ o.scalacArgs)
-    def addName(name: String) = copy(names = name :: names)
+   def addName(name: String) = copy(names = name :: names)
     def addTraverser(traverser: String) = copy(traversers = traverser :: traversers)
     def addScalacArg(scalacArg: String) = copy(scalacArgs = scalacArg :: scalacArgs)
   }
