@@ -77,6 +77,7 @@ jobs:
     - uses: reviewdog/action-suggester@8f83d27e749053b2029600995c115026a010408e # v1.6.0
       if: ${{ failure() && matrix.name == 'format' }}
       with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
         tool_name: scalafmt
     - shell: bash
       run: rm -rf "$HOME/.ivy2/local" || true
