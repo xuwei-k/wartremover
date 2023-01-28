@@ -56,10 +56,10 @@ jobs:
         echo "${PWD}" >> $GITHUB_PATH
     - run: reviewdog -version
       if: ${{ (github.event_name == 'pull_request') && failure() && matrix.name == 'format' }}
-    - uses: reviewdog/action-suggester@8f83d27e749053b2029600995c115026a010408e # v1.6.0
-      if: ${{ (github.event_name == 'pull_request') && failure() && matrix.name == 'format' }}
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        tool_name: scalafmt
+    - if: ${{ (github.event_name == 'pull_request') && failure() && matrix.name == 'format' }}
+      run: |
+        export INPUT_GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+        export INPUT_TOOL_NAME="scalafmt"
+        wget https://raw.githubusercontent.com/reviewdog/action-suggester/8f83d27e749053b2029600995c115026a010408e/script.sh -O - | sh
     - shell: bash
       run: rm -rf "$HOME/.ivy2/local" || true
