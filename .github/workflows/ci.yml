@@ -53,13 +53,12 @@ jobs:
         gunzip ${FILE_NAME}.tar.gz &&
         tar -xf ${FILE_NAME}.tar &&
         chmod +x ./reviewdog &&
-        echo "${PWD}" >> $GITHUB_PATH
-        reviewdog -version
+        ./reviewdog -version
         export REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }}
         TMPFILE=$(mktemp)
         git diff > "${TMPFILE}"
         git stash -u
-        reviewdog \
+        ./reviewdog \
           -name="scalafmt" \
           -f=diff \
           -f.diff.strip=1 \
