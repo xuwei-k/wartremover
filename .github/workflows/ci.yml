@@ -14,35 +14,6 @@ jobs:
           - name: "format"
             java: 8
             os: ubuntu-latest
-          - name: "inspector"
-            java: 17
-            os: ubuntu-latest
-          - name: "test-cross"
-            test_index: 0
-            java: 8
-            os: ubuntu-latest
-          - name: "test-cross"
-            test_index: 1
-            java: 8
-            os: ubuntu-latest
-          - name: "test-cross"
-            test_index: 2
-            java: 8
-            os: ubuntu-latest
-          - name: "scripted"
-            java: 8
-            os: ubuntu-latest
-            test_index: 1
-          - name: "scripted"
-            java: 8
-            os: ubuntu-latest
-            test_index: 2
-          - name: "test"
-            java: 11
-            os: ubuntu-latest
-          - name: "test"
-            java: 17
-            os: ubuntu-latest
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/setup-java@v3
@@ -74,6 +45,12 @@ jobs:
             echo "unknown job"
             exit 1
         esac
+    - uses: reviewdog/action-setup@8f2ec89e6b467ca9175527d2a1641bbd0c05783b # v1.0.3
+      if: ${{ failure() && matrix.name == 'format' }}
+      with:
+        reviewdog_version: v0.14.1
+    - run: reviewdog -version
+      if: ${{ failure() && matrix.name == 'format' }}
     - uses: reviewdog/action-suggester@8f83d27e749053b2029600995c115026a010408e # v1.6.0
       if: ${{ failure() && matrix.name == 'format' }}
       with:
