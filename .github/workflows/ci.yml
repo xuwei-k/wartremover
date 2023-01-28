@@ -45,10 +45,12 @@ jobs:
             echo "unknown job"
             exit 1
         esac
-    - uses: reviewdog/action-setup@8f2ec89e6b467ca9175527d2a1641bbd0c05783b # v1.0.3
-      if: ${{ (github.event_name == 'pull_request') && failure() && matrix.name == 'format' }}
-      with:
-        reviewdog_version: v0.14.0
+    - if: ${{ (github.event_name == 'pull_request') && failure() && matrix.name == 'format' }}
+      run: |
+        curl -sfL https://raw.githubusercontent.com/reviewdog/reviewdog/0a30b200857c839cd6f829ebdf3f6dc83a5f9a17/install.sh | bash -s
+        export REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }}
+        chmod +x ./bin/reviewdog
+        echo "${PWD}/bin" >> $GITHUB_PATH
     - run: reviewdog -version
       if: ${{ (github.event_name == 'pull_request') && failure() && matrix.name == 'format' }}
     - uses: reviewdog/action-suggester@8f83d27e749053b2029600995c115026a010408e # v1.6.0
