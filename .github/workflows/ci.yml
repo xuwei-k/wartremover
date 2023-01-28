@@ -57,7 +57,6 @@ jobs:
         export REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }}
         TMPFILE=$(mktemp)
         git diff > "${TMPFILE}"
-        git stash -u
         ./reviewdog \
           -name="scalafmt" \
           -f=diff \
