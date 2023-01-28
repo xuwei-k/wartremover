@@ -54,13 +54,18 @@ jobs:
         tar -xf ${FILE_NAME}.tar &&
         chmod +x ./reviewdog &&
         echo "${PWD}" >> $GITHUB_PATH
-    - run: reviewdog -version
-      if: ${{ (github.event_name == 'pull_request') && failure() && matrix.name == 'format' }}
-    - if: ${{ (github.event_name == 'pull_request') && failure() && matrix.name == 'format' }}
-      run: |
-        export INPUT_GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-        export INPUT_TOOL_NAME="scalafmt"
-        wget https://raw.githubusercontent.com/reviewdog/action-suggester/8f83d27e749053b2029600995c115026a010408e/script.sh
-        bash script.sh
+        reviewdog -version
+        export REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }}
+        TMPFILE=$(mktemp)
+        git diff > "${TMPFILE}"
+        git stash -u
+        reviewdog \
+          -name="scalafmt" \
+          -f=diff \
+          -f.diff.strip=1 \
+          -reporter="github-pr-review" \
+          -filter-mode="diff_context" \
+          -fail-on-error="false" \
+          -level="warning" <"${TMPFILE}"
     - shell: bash
       run: rm -rf "$HOME/.ivy2/local" || true
