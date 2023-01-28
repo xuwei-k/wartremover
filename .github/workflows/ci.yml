@@ -46,13 +46,13 @@ jobs:
             exit 1
         esac
     - uses: reviewdog/action-setup@8f2ec89e6b467ca9175527d2a1641bbd0c05783b # v1.0.3
-      if: ${{ failure() && matrix.name == 'format' }}
+      if: ${{ (github.event_name == 'pull_request') && failure() && matrix.name == 'format' }}
       with:
-        reviewdog_version: v0.14.1
+        reviewdog_version: v0.14.0
     - run: reviewdog -version
-      if: ${{ failure() && matrix.name == 'format' }}
+      if: ${{ (github.event_name == 'pull_request') && failure() && matrix.name == 'format' }}
     - uses: reviewdog/action-suggester@8f83d27e749053b2029600995c115026a010408e # v1.6.0
-      if: ${{ failure() && matrix.name == 'format' }}
+      if: ${{ (github.event_name == 'pull_request') && failure() && matrix.name == 'format' }}
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         tool_name: scalafmt
