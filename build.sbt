@@ -284,6 +284,9 @@ lazy val core = Project(
       ).map(_ + "Test.scala")
       (Test / sources).value.filterNot(f => exclude(f.getName))
     } else {
+      val exclude = Set[String](
+        "OrTypeLeastUpperBound",
+      ).map(_ + "Test.scala")
       (Test / sources).value
     }
   },
