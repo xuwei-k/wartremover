@@ -54,10 +54,13 @@ abstract class OrTypeLeastUpperBound[A <: NonEmptyTuple](using getType: Quotes ?
                   implicit val ctx = q.asInstanceOf[QuotesImpl].ctx
                   t.asInstanceOf[DottyType].widenUnion.asInstanceOf[TypeRepr]
                 }
-                if (types.exists(lub <:< _)) {
-                  val left = t.left.show
-                  val right = t.right.show
-                  error(tree.pos, s"least upper bound is `${lub.show}`. `${left} | ${right}`")
+                types.find(lub <:< _) match {
+                  case Some(badType) =>
+                    println(badType.show)
+                    val left = t.left.show
+                    val right = t.right.show
+                    error(tree.pos, s"least upper bound is `${lub.show}`. `${left} | ${right}`")
+                  case _ =>
                 }
               case _ =>
             }
