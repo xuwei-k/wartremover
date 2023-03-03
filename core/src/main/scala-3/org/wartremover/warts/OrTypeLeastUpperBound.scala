@@ -1,6 +1,7 @@
 package org.wartremover
 package warts
 
+import scala.quoted.Expr
 import scala.quoted.Quotes
 import scala.quoted.Type
 import scala.quoted.runtime.impl.QuotesImpl
@@ -19,6 +20,56 @@ object OrTypeLeastUpperBound {
       ]
   object Any extends OrTypeLeastUpperBound[scala.Any *: EmptyTuple]
   object AnyRef extends OrTypeLeastUpperBound[scala.AnyRef *: EmptyTuple]
+  object AnyVal {
+    object Strict extends OrTypeLeastUpperBound[scala.AnyVal *: EmptyTuple]
+
+    object OnlyWeakConformance extends WartTraverser {
+      def apply(u: WartUniverse): u.Traverser = {
+        new u.Traverser(this) {
+          import q.reflect.*
+
+          def andTypes(t: TypeRepr): List[TypeRepr] = {
+            t match {
+              case x: AndType =>
+                andTypes(x.left) ::: andTypes(x.right)
+              case _ =>
+                t :: Nil
+            }
+          }
+
+          override def traverseTree(tree: Tree)(owner: Symbol): Unit = {
+            tree match {
+              case _ if hasWartAnnotation(tree) =>
+              case a: Inferred =>
+                a.tpe match {
+                  case t: OrType =>
+                    val lub = {
+                      implicit val ctx = q.asInstanceOf[QuotesImpl].ctx
+                      t.asInstanceOf[DottyType].widenUnion.asInstanceOf[TypeRepr]
+                    }
+                    val lubAndTypes = andTypes(lub)
+                    if (lubAndTypes.exists(_ =:= TypeRepr.of[scala.AnyVal])) {
+                      val ap = new ApplyWeakConformance[q.type](strict = false)
+                      ap.weakConformance(t.left, t.right) match {
+                        case None =>
+                          val left = t.left.show
+                          val right = t.right.show
+                          error(tree.pos, s"least upper bound is `${lub.show}`. `${left} | ${right}`")
+                        case _ =>
+                        // ok
+                      }
+                    }
+                  case _ =>
+                }
+                super.traverseTree(tree)(owner)
+              case _ =>
+                super.traverseTree(tree)(owner)
+            }
+          }
+        }
+      }
+    }
+  }
   object Matchable extends OrTypeLeastUpperBound[scala.Matchable *: EmptyTuple]
   object Product extends OrTypeLeastUpperBound[scala.Product *: EmptyTuple]
   object Serializable extends OrTypeLeastUpperBound[scala.Serializable *: EmptyTuple]

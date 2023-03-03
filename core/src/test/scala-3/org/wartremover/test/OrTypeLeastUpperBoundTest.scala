@@ -1,6 +1,9 @@
 package org.wartremover
 package test
 
+import scala.quoted.Expr
+import scala.quoted.Quotes
+import scala.quoted.Type
 import org.wartremover.warts.OrTypeLeastUpperBound
 import org.scalatest.funsuite.AnyFunSuite
 
@@ -98,6 +101,95 @@ class OrTypeLeastUpperBoundTest extends AnyFunSuite with ResultAssertions {
     assertError(result)(
       "least upper bound is `java.lang.Object & scala.Product & java.io.Serializable`. `org.wartremover.test.OrTypeLeastUpperBoundTest.A1 | org.wartremover.test.OrTypeLeastUpperBoundTest.B`"
     )
+  }
+
+  private def byte: Byte = 1
+  private def char: Char = 'a'
+  private def short: Short = 2
+  private def int: Int = 3
+  private def long: Long = 4
+  private def bool: Boolean = true
+  private def unit: Unit = ()
+  private def float: Float = 5.0f
+  private def double: Double = 6.0
+
+  test("AnyVal.Strict") {
+    val result = WartTestTraverser(OrTypeLeastUpperBound.AnyVal.Strict) {
+      List(short, int)
+      List(int, long)
+      List(char, int)
+      List(unit, bool)
+      List(float, double)
+      List(int, double)
+    }
+    assert(result.errors.size == 6)
+    assert(result.errors.forall(_.contains("least upper bound is")), result)
+  }
+
+  test("AnyVal.OnlyWeakConformance") {
+    import OrTypeLeastUpperBound.AnyVal.OnlyWeakConformance
+    val results = List(
+      WartTestTraverser(OnlyWeakConformance) {
+        List(unit, bool)
+      },
+      WartTestTraverser(OnlyWeakConformance) {
+        List(unit, byte)
+      },
+      WartTestTraverser(OnlyWeakConformance) {
+        List(unit, short)
+      },
+      WartTestTraverser(OnlyWeakConformance) {
+        List(unit, int)
+      },
+      WartTestTraverser(OnlyWeakConformance) {
+        List(unit, long)
+      },
+      WartTestTraverser(OnlyWeakConformance) {
+        List(unit, float)
+      },
+      WartTestTraverser(OnlyWeakConformance) {
+        List(unit, double)
+      },
+      WartTestTraverser(OnlyWeakConformance) {
+        List(bool, byte)
+      },
+      WartTestTraverser(OnlyWeakConformance) {
+        List(bool, short)
+      },
+      WartTestTraverser(OnlyWeakConformance) {
+        List(bool, int)
+      },
+      WartTestTraverser(OnlyWeakConformance) {
+        List(bool, long)
+      },
+      WartTestTraverser(OnlyWeakConformance) {
+        List(bool, float)
+      },
+      WartTestTraverser(OnlyWeakConformance) {
+        List(bool, double)
+      },
+      WartTestTraverser(OnlyWeakConformance) {
+        List(double, long)
+      },
+      WartTestTraverser(OnlyWeakConformance) {
+        List(float, long)
+      }
+    )
+    results.zipWithIndex.foreach { (r, i) =>
+      assert(r.errors.size == 1, (r, i))
+      assert(r.errors.forall(_.contains("least upper bound is")), r)
+    }
+  }
+
+  test("AnyVal.OnlyWeakConformance allow waek conformance") {
+    val result = WartTestTraverser(OrTypeLeastUpperBound.AnyVal.OnlyWeakConformance) {
+      List(byte, short, char, int, long)
+      List(byte, short, char, int, float, double)
+      List(byte, short, float)
+      List(byte, short, char, int)
+      List(byte, short)
+    }
+    assertEmpty(result)
   }
 }
 
