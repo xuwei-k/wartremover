@@ -9,12 +9,20 @@ import sbt.Keys.*
 import sbt.SlashSyntax.HasSlashKey
 import sjsonnew.JsonFormat
 import sjsonnew.support.scalajson.unsafe.CompactPrinter
+import xsbti.compile.CompileAnalysis
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileNotFoundException
+import java.net.URLClassLoader
+import java.util.zip.ZipInputStream
+import scala.annotation.tailrec
 
 object WartRemover extends sbt.AutoPlugin {
   override def trigger = allRequirements
   object autoImport {
     val WartremoverTag = Tags.Tag("wartremover")
     val wartremoverFailIfWartLoadError = settingKey[Boolean]("")
+    val wartremoverRun = inputKey[Option[CompileAnalysis]]("run input wartremover by task")
     val wartremoverInspect = taskKey[InspectResult]("run wartremover by TASTy inspector")
     val wartremoverInspectOutputFile = settingKey[Option[File]]("")
     val wartremoverInspectOutputStandardReporter = settingKey[Boolean]("")
@@ -366,6 +374,139 @@ object WartRemover extends sbt.AutoPlugin {
     }
   }
 
+  private[this] def getAllClassNamesInJar(jar: File): List[String] = {
+    val suffix = ".class"
+    scala.util.Using.resource(new ZipInputStream(new FileInputStream(jar))) { zip =>
+      Iterator
+        .continually(
+          zip.getNextEntry
+        )
+        .takeWhile(_ != null)
+        .filter(e => !e.isDirectory && e.getName.endsWith(suffix))
+        .map(
+          _.getName.replace('/', '.').dropRight(suffix.length)
+        )
+        .toList
+    }
+  }
+
+  def wartremoverRunTask(c: Configuration): Def.Initialize[InputTask[Option[CompileAnalysis]]] = Def.inputTask {
+    def getSources(f: File): Seq[String] = {
+      if (f.isFile) {
+        scala.io.Source.fromFile(f)(scala.io.Codec.UTF8).getLines().mkString("\n") :: Nil
+      } else if (f.isDirectory) {
+        f.listFiles(_.isFile)
+          .map { f =>
+            scala.io.Source.fromFile(f)(scala.io.Codec.UTF8).getLines().mkString("\n")
+          }
+          .toList
+      } else {
+        throw new FileNotFoundException(f.getAbsolutePath)
+      }
+    }
+
+    val sourceFiles = {
+      import sbt.complete.DefaultParsers.*
+      (token(Space) ~> token(basicUri || fileParser(file("/")), "wartremover source file or url")).+ <~ SpaceClass.*
+    }.parsed.flatMap {
+      case Right(arg) =>
+        getSources(arg)
+      case Left(arg) =>
+        arg.getScheme match {
+          case null =>
+            getSources(file(arg.toString))
+          case _ =>
+            scala.io.Source.fromURL(arg.toURL)(scala.io.Codec.UTF8).getLines().mkString("\n") :: Nil
+        }
+    }
+
+    val buildSbt = s"""
+                      |logLevel := Level.Warn
+                      |scalaVersion := "${scalaVersion.value}"
+                      |crossPaths := false
+                      |libraryDependencies := Seq(
+                      |  "org.wartremover" %% "wartremover" % "${Wart.PluginVersion}"
+                      |)
+                      |""".stripMargin
+
+    val launcher = sbtLauncher(wartremoverRun).value
+    val log = state.value.log
+
+    IO.withTemporaryDirectory { dir =>
+      IO.write(dir / "build.sbt", buildSbt.getBytes(StandardCharsets.UTF_8))
+      sourceFiles.zipWithIndex.foreach { case (src, index) =>
+        IO.write(dir / s"${index}.scala", src.getBytes(StandardCharsets.UTF_8))
+      }
+      log.info(s"compile ${sourceFiles.size} files")
+      val exitCode = Fork.java.apply(
+        (wartremoverRun / forkOptions).value.withWorkingDirectory(dir),
+        Seq(
+          "-jar",
+          launcher.getCanonicalPath,
+          packageBin.key.label
+        )
+      )
+      assert(exitCode == 0, s"exit code = $exitCode")
+      log.info(s"compiled ${sourceFiles.size} files")
+      val Seq(compiledJar) = (dir / "target").listFiles(f => f.isFile && f.getName.endsWith(".jar")).toList
+      log.debug(s"compiled jar = $compiledJar")
+      val classes = getAllClassNamesInJar(compiledJar)
+      if (classes.isEmpty) {
+        log.error("not found compiled classes")
+        None
+      } else {
+        log.info(s"compiled classes = ${classes.mkString(" ")}")
+        val wartremoverJars = Def.taskDyn {
+          val c = wartremoverCrossVersion.value
+          Def.task(
+            getJarFiles(
+              "org.wartremover" %% "wartremover" % Wart.PluginVersion cross c
+            ).value
+          )
+        }.value
+        val loader = new URLClassLoader(
+          (compiledJar.toURI.toURL +: wartremoverJars.map(_.toURI.toURL)).toArray
+        )
+        val impl = classes.filter { className =>
+          val clazz = Class.forName(className, false, loader)
+          val traverserName = "org.wartremover.WartTraverser"
+          if (scalaBinaryVersion.value == "3") {
+            @tailrec
+            def loop(c: Class[?]): Boolean = {
+              if (c == null) {
+                false
+              } else if (c.getName == traverserName) {
+                true
+              } else {
+                loop(c.getSuperclass)
+              }
+            }
+            loop(clazz)
+          } else {
+            clazz.getInterfaces.exists(_.getName == traverserName)
+          }
+        }.map { s =>
+          if (s.endsWith("$")) s.dropRight(1) else s
+        }
+        if (impl.isEmpty) {
+          log.error("not found WartTraverser implement classes")
+          None
+        } else {
+          log.info(s"WartTraverser implement classes = ${impl.mkString(", ")}")
+          val s = (thisProjectRef / state).value.appendWithSession(
+            Def.settings(
+              thisProjectRef.value / c / wartremoverClasspaths += s"file:${compiledJar.getCanonicalPath}",
+              thisProjectRef.value / c / wartremoverErrors ++= impl.map(x => Wart.custom(x)),
+            )
+          )
+          val extracted = Project.extract(s)
+          extracted.runTask(thisProjectRef.value / clean, s)
+          Some(extracted.runTask(thisProjectRef.value / c / compile, s)._2)
+        }
+      }
+    }
+  }
+
   override lazy val projectSettings: Seq[Def.Setting[_]] = Def.settings(
     libraryDependencies ++= {
       Seq(
@@ -381,6 +522,9 @@ object WartRemover extends sbt.AutoPlugin {
     scalacOptionSetting(scalacOptions),
     scalacOptionSetting(Compile / scalacOptions),
     scalacOptionSetting(Test / scalacOptions),
+    Seq(Compile, Test).flatMap { x =>
+      x / wartremoverRun := wartremoverRunTask(x).evaluated
+    },
     scalacOptions ++= {
       // use relative path
       // https://github.com/sbt/sbt/issues/6027
