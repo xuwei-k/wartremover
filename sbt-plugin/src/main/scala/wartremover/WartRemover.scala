@@ -403,15 +403,35 @@ object WartRemover extends sbt.AutoPlugin {
     scalacOptionSetting(Test / scalacOptions),
     Seq(Compile, Test).flatMap { x =>
       x / wartremoverRun := {
+
+        def getSources(f: File): Seq[String] = {
+          if (f.isFile) {
+            scala.io.Source.fromFile(f)(scala.io.Codec.UTF8).getLines().mkString("\n") :: Nil
+          } else if (f.isDirectory) {
+            f.listFiles(_.isFile)
+              .map { f =>
+                scala.io.Source.fromFile(f)(scala.io.Codec.UTF8).getLines().mkString("\n")
+              }
+              .toList
+          } else {
+            Nil
+          }
+        }
+
         val sourceFiles = {
           import sbt.complete.DefaultParsers.*
           (token(Space) ~> token(basicUri || fileParser(file("/")), "wartremover source file or url")).+ <~ SpaceClass.*
-        }.parsed.map {
+        }.parsed.flatMap {
           case Right(arg) =>
-            scala.io.Source.fromFile(arg)(scala.io.Codec.UTF8)
+            getSources(arg)
           case Left(arg) =>
-            scala.io.Source.fromURL(arg.toURL)(scala.io.Codec.UTF8)
-        }.map(_.getLines().mkString("\n"))
+            arg.getScheme match {
+              case null =>
+                getSources(file(arg.toString))
+              case _ =>
+                scala.io.Source.fromURL(arg.toURL)(scala.io.Codec.UTF8).getLines().mkString("\n") :: Nil
+            }
+        }
 
         val buildSbt = s"""
            |logLevel := Level.Warn

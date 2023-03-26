@@ -1,0 +1,10 @@
+> + compile
+
+> a2/wartremoverRun warts/2
+-> a1/wartremoverRun warts/2
+-> wartremoverRun warts/2
+
+> ++ 3.x
+> a2/wartremoverRun warts/3
+-> a1/wartremoverRun warts/3
+-> wartremoverRun warts/3
