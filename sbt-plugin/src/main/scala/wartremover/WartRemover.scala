@@ -488,15 +488,16 @@ object WartRemover extends sbt.AutoPlugin {
               log.error("not found WartTraverser implement classes")
             } else {
               log.info(s"WartTraverser implement classes = ${impl.mkString(", ")}")
-              val s = state.value.appendWithoutSession(
+              val s = (thisProjectRef / state).value.appendWithoutSession(
                 Def.settings(
-                  x / wartremoverClasspaths += s"file:${compiledJar.getCanonicalPath}",
-                  x / wartremoverErrors ++= impl.map(x => Wart.custom(x))
+                  thisProjectRef.value / x / wartremoverClasspaths += s"file:${compiledJar.getCanonicalPath}",
+                  thisProjectRef.value / x / wartremoverErrors ++= impl.map(x => Wart.custom(x)),
                 ),
-                state.value
+                (thisProjectRef / state).value
               )
-              Project.extract(s).runTask(clean, s)
-              Project.extract(s).runTask(x / compile, s)
+              val extracted = Project.extract(s)
+              extracted.runTask(thisProjectRef.value / clean, s)
+              extracted.runTask(thisProjectRef.value / x / compile, s)
             }
           }
         }
