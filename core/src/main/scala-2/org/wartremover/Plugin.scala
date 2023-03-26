@@ -4,6 +4,7 @@ import tools.nsc.plugins.PluginComponent
 import tools.nsc.Global
 import tools.nsc.Phase
 import java.io.File
+import java.io.FileNotFoundException
 import java.net.URI
 import java.net.URLClassLoader
 import scala.reflect.internal.util.NoPosition
@@ -39,7 +40,12 @@ class Plugin(val global: Global) extends tools.nsc.plugins.Plugin {
     val classPathEntries = filterOptions("cp", options).map { c =>
       val filePrefix = "file:"
       if (c startsWith filePrefix) {
-        new File(c.drop(filePrefix.length)).getCanonicalFile.toURI.toURL
+        val f = new File(c.drop(filePrefix.length)).getCanonicalFile
+        if (f.exists()) {
+          f.toURI.toURL
+        } else {
+          throw new FileNotFoundException(f.toString)
+        }
       } else {
         new URI(c).toURL
       }
