@@ -11,6 +11,7 @@ import sjsonnew.JsonFormat
 import sjsonnew.support.scalajson.unsafe.CompactPrinter
 import java.io.File
 import java.io.FileInputStream
+import java.io.FileNotFoundException
 import java.net.URLClassLoader
 import java.util.zip.ZipInputStream
 
@@ -414,7 +415,7 @@ object WartRemover extends sbt.AutoPlugin {
               }
               .toList
           } else {
-            Nil
+            throw new FileNotFoundException(f.getAbsolutePath)
           }
         }
 

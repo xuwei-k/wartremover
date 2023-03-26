@@ -1,7 +1,10 @@
 > + compile
 
 > a2/wartremoverRun warts/2
+-> a2/wartremoverRun warts/2/NotExistsFile.scala
+> a2/wartremoverRun warts/2/DisableHoge.scala
 -> a1/wartremoverRun warts/2
+-> a1/wartremoverRun warts/2/DisableHoge.scala
 -> wartremoverRun warts/2
 
 > ++ 3.x
