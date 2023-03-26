@@ -1,13 +1,20 @@
 > + compile
 
+> wartremoverRun https://raw.githubusercontent.com/wartremover/wartremover-contrib/379526ebb70db9952/core/src/main/scala-2/org/wartremover/contrib/warts/SymbolicName.scala
+
 > a2/wartremoverRun warts/2
 -> a2/wartremoverRun warts/2/NotExistsFile.scala
 > a2/wartremoverRun warts/2/DisableHoge.scala
+-> a2/Test/wartremoverRun warts/2/DisableHoge.scala
 -> a1/wartremoverRun warts/2
 -> a1/wartremoverRun warts/2/DisableHoge.scala
 -> wartremoverRun warts/2
 
 > ++ 3.x
+> show scalaVersion
+
+> wartremoverRun https://raw.githubusercontent.com/wartremover/wartremover-contrib/379526ebb70db9952/core/src/main/scala-3/org/wartremover/contrib/warts/SymbolicName.scala
+
 > a2/wartremoverRun warts/3
 -> a1/wartremoverRun warts/3
 -> wartremoverRun warts/3
