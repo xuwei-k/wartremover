@@ -382,9 +382,6 @@ object WartRemover extends sbt.AutoPlugin {
     }
   }
 
-  val WartremoverCompile = config("WartremoverCompile").extend(Compile)
-  val WartremoverTest = config("WartremoverTest").extend(Test)
-
   private[this] def getAllClassNamesInJar(jar: File): List[String] = {
     val suffix = ".class"
     scala.util.Using.resource(new ZipInputStream(new FileInputStream(jar))) { zip =>
@@ -452,7 +449,7 @@ object WartRemover extends sbt.AutoPlugin {
     Await.result(res, 2.minutes)
   }
 
-  def wartremoverRunTask(c: Configuration, c2: Configuration): Def.Initialize[InputTask[Option[CompileAnalysis]]] =
+  def wartremoverRunTask(c: Configuration): Def.Initialize[InputTask[Option[CompileAnalysis]]] =
     Def.inputTaskDyn {
       def getSources(f: File): Seq[String] = {
         if (f.isFile) {
@@ -535,30 +532,41 @@ object WartRemover extends sbt.AutoPlugin {
               Def.task(None)
             } else {
               log.info(s"WartTraverser implement classes = ${impl.mkString(", ")}")
-              log.info(s"write to = ${(c / wartremoverOptionsFile).value}")
-              IO.writeLines(
-                (c / wartremoverOptionsFile).value,
-                Seq(
+              val oldOptions = (c / compile / scalacOptions).value
+              Def.taskDyn {
+                log.info(s"write to = ${(c / wartremoverOptionsFile).value}")
+                IO.writeLines(
+                  (c / wartremoverOptionsFile).value,
                   Seq(
-                    s"-P:wartremover:cp:file:${compiledJar.getCanonicalPath}", {
-                      val k = "dummy-arg-for-recompile-if-wartremover-jar-file-changed"
-                      val v = MurmurHash3.seqHash(bytes)
-                      s"-D${k}=${v}"
-                    }
-                  ),
-                  impl.map(w => s"-P:wartremover:traverser:${w}"),
-                ).flatten
-              )
-              println(s"${c2.name} sources = ${(c2 / sources).value}")
-              Def.task {
-                Some(
-                  Def
-                    .sequential(
-                      c2 / scalacOptions,
-                      c2 / compile
-                    )
-                    .value
+                    oldOptions,
+                    Seq(
+                      s"-P:wartremover:cp:file:${compiledJar.getCanonicalPath}", {
+                        val k = "dummy-arg-for-recompile-if-wartremover-jar-file-changed"
+                        val v = MurmurHash3.seqHash(bytes)
+                        s"-D${k}=${v}"
+                      }
+                    ),
+                    impl.map(w => s"-P:wartremover:traverser:${w}"),
+                  ).flatten
                 )
+                Def.taskDyn {
+                  Project.runTask(thisProjectRef.value / c / compile / scalacOptions, state.value)
+                  Def.taskDyn {
+                    val result = (c / compile).value
+                    log.info(s"compiled $result")
+                    Def.taskDyn {
+                      log.info(s"revert ${(c / wartremoverOptionsFile).value}")
+                      IO.writeLines(
+                        (c / wartremoverOptionsFile).value,
+                        oldOptions,
+                      )
+                      Def.task {
+                        Project.runTask(thisProjectRef.value / c / compile / scalacOptions, state.value)
+                        Some(result)
+                      }
+                    }
+                  }
+                }
               }
             }
           }
@@ -583,39 +591,34 @@ object WartRemover extends sbt.AutoPlugin {
     scalacOptionSetting(Test / scalacOptions),
     Compile / wartremoverOptionsFile := target.value / "options-compile.txt",
     Test / wartremoverOptionsFile := target.value / "options-test.txt",
-    WartremoverCompile / scalacOptions ++= {
+    Compile / compile / scalacOptions := {
       val f = (Compile / wartremoverOptionsFile).value
       val log = streams.value.log
+      val default = (Compile / compile / scalacOptions).value
       if (f.isFile) {
         val lines = IO.readLines(f)
         log.info(s"options = $lines")
         lines
       } else {
         log.warn(s"not found ${f}")
-        Nil
+        default
       }
     },
-    WartremoverTest / scalacOptions ++= {
+    Test / compile / scalacOptions ++= {
       val f = (Test / wartremoverOptionsFile).value
       val log = streams.value.log
+      val default = (Test / compile / scalacOptions).value
       if (f.isFile) {
         val lines = IO.readLines(f)
         log.info(s"options = $lines")
         lines
       } else {
         log.warn(s"not found ${f}")
-        Nil
+        default
       }
     },
-    inConfig(WartremoverCompile)(Defaults.compileSettings),
-    inConfig(WartremoverTest)(Defaults.compileSettings),
-    WartremoverCompile / sources := (Compile / sources).value,
-    WartremoverTest / sources := (Test / sources).value,
-    Seq(
-      (Compile, WartremoverCompile),
-      (Test, WartremoverTest)
-    ).flatMap { case (x1, x2) =>
-      x1 / wartremoverRun := wartremoverRunTask(x1, x2).evaluated
+    Seq(Compile, Test).flatMap { x =>
+      x / wartremoverRun := wartremoverRunTask(x).evaluated
     },
     scalacOptions ++= {
       // use relative path

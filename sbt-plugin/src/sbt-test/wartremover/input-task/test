@@ -1,4 +1,4 @@
-> + compile
+> + Test/compile
 
 > wartremoverRun https://raw.githubusercontent.com/wartremover/wartremover-contrib/379526ebb70db9952/core/src/main/scala-2/org/wartremover/contrib/warts/SymbolicName.scala
 
@@ -22,3 +22,11 @@
 -> a2/wartremoverRun warts/3
 -> a2/wartremoverRun warts/3/DisableHoge.scala
 -> wartremoverRun warts/3
+
+> show Compile/scalacOptions
+> show Test/scalacOptions
+
+> ++ 2.13.x
+> Test/compile
+> ++ 2.12.x
+> Test/compile
