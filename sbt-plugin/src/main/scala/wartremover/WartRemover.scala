@@ -350,12 +350,22 @@ object WartRemover extends sbt.AutoPlugin {
     x / wartremoverInspectOutputFile := None,
     x / wartremoverInspectRun := Def.inputTaskDyn {
       val parsed = {
+
         import sbt.complete.DefaultParsers.*
-        val other = token(StringBasic).map(_root_.wartremover.Wart.custom)
-        (token(Space) ~> _root_.wartremover.Warts.all
-          .map(w => token(w.clazz).map(_ => w))
-          .foldLeft(other)(_ | _)).+ <~ SpaceClass.*
+        import sbt.complete.Parser
+
+        def distinctParser(exs: Set[String]): Parser[Seq[String]] = {
+          val base = token(Space) ~> token(NotSpace examples exs)
+          base.flatMap { ex =>
+            val (_, notMatching) = exs.partition(GlobFilter(ex).accept)
+            distinctParser(notMatching).map { result => ex +: result }
+          } ?? Nil
+        }
+
+        distinctParser(_root_.wartremover.Warts.all.map(_.clazz).toSet).map(_.map(_root_.wartremover.Wart.custom))
       }.parsed
+
+      streams.value.log.info(parsed.toString())
 
       createInspectTask(
         x = x,
