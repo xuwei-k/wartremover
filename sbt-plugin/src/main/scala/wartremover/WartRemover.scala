@@ -10,7 +10,10 @@ import sbt.SlashSyntax.HasSlashKey
 import sjsonnew.JsonFormat
 import sjsonnew.support.scalajson.unsafe.CompactPrinter
 import java.io.FileInputStream
+import java.io.FileNotFoundException
+import java.net.URLClassLoader
 import java.util.zip.ZipInputStream
+import scala.annotation.tailrec
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext
@@ -354,14 +357,26 @@ object WartRemover extends sbt.AutoPlugin {
     }
   }
 
+  private[this] def getSources(f: File): Seq[String] = {
+    if (f.isFile) {
+      scala.io.Source.fromFile(f)(scala.io.Codec.UTF8).getLines().mkString("\n") :: Nil
+    } else if (f.isDirectory) {
+      f.listFiles(_.isFile)
+        .map { f =>
+          scala.io.Source.fromFile(f)(scala.io.Codec.UTF8).getLines().mkString("\n")
+        }
+        .toList
+    } else {
+      throw new FileNotFoundException(f.getAbsolutePath)
+    }
+  }
+
   private[this] def inspectTask(x: Configuration): Seq[Def.Setting[?]] = Def.settings(
     x / wartremoverInspectOutputFile := None,
     x / wartremoverInspectRun := Def.inputTaskDyn {
       val parsed = {
-
         import sbt.complete.DefaultParsers.*
         import sbt.complete.Parser
-
         def distinctParser(exs: Set[String]): Parser[Seq[String]] = {
           val base = token(Space) ~> token(NotSpace examples exs)
           base.flatMap { ex =>
@@ -369,17 +384,87 @@ object WartRemover extends sbt.AutoPlugin {
             distinctParser(notMatching).map { result => ex +: result }
           } ?? Nil
         }
+        val f = {
+          token(Space ~> "--file") ~> (Space ~> token(
+            fileParser(file("/")),
+            "wartremover source file or url"
+          )).+ <~ SpaceClass.*
+        }
 
-        distinctParser(_root_.wartremover.Warts.all.map(_.clazz).toSet).map(_.map(_root_.wartremover.Wart.custom))
+        distinctParser(_root_.wartremover.Warts.all.map(_.clazz).toSet).map(_.map(_root_.wartremover.Wart.custom)) || f
       }.parsed
 
-      streams.value.log.info(parsed.toString())
+      Def.taskDyn {
+        val wartremoverJars = Def.taskDyn {
+          val wartremoverCross = wartremoverCrossVersion.value
+          Def.task(
+            getJarFiles(
+              "org.wartremover" %% "wartremover" % Wart.PluginVersion cross wartremoverCross
+            ).value
+          )
+        }.value
 
-      createInspectTask(
-        x = x,
-        warningWartNames = parsed,
-        errorWartNames = Nil,
-      )
+        val log = streams.value.log
+
+        log.info(parsed.toString)
+
+        Def.taskDyn {
+          parsed match {
+            case Left(value) =>
+              createInspectTask(
+                x = x,
+                warningWartNames = value,
+                errorWartNames = Nil,
+              )
+            case Right(value) =>
+              val sourceFiles = value.flatMap(getSources)
+              Def.taskDyn[InspectResult] {
+                val bytes: Seq[Byte] = getJar(sourceFiles.toSet).value
+                val compiledJar = target.value / "wartremover" / "warts.jar"
+                IO.write(compiledJar, bytes.toArray)
+                log.debug(s"compiled jar = $compiledJar")
+                val classes = getAllClassNamesInJar(compiledJar)
+                if (classes.isEmpty) {
+                  log.error("not found compiled classes")
+                  Def.task(InspectResult.empty)
+                } else {
+                  log.info(s"compiled classes = ${classes.mkString(" ")}")
+
+                  val loader = new URLClassLoader(
+                    (compiledJar.toURI.toURL +: wartremoverJars.map(_.toURI.toURL)).toArray
+                  )
+                  val impl = classes.filter { className =>
+                    val clazz = Class.forName(className, false, loader)
+                    val traverserName = "org.wartremover.WartTraverser"
+                    @tailrec
+                    def loop(c: Class[?]): Boolean = {
+                      if (c == null) {
+                        false
+                      } else if (c.getName == traverserName) {
+                        true
+                      } else {
+                        loop(c.getSuperclass)
+                      }
+                    }
+                    loop(clazz)
+                  }.map { s =>
+                    if (s.endsWith("$")) s.dropRight(1) else s
+                  }
+                  if (impl.isEmpty) {
+                    log.error("not found WartTraverser implement classes")
+                    Def.task(InspectResult.empty)
+                  } else {
+                    createInspectTask(
+                      x = x,
+                      warningWartNames = impl.map(Wart.custom),
+                      errorWartNames = Nil,
+                    )
+                  }
+                }
+              }
+          }
+        }
+      }
     }.evaluated,
     x / wartremoverInspect := Def.taskDyn {
       createInspectTask(
