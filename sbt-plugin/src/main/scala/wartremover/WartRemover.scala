@@ -9,6 +9,14 @@ import sbt.Keys.*
 import sbt.SlashSyntax.HasSlashKey
 import sjsonnew.JsonFormat
 import sjsonnew.support.scalajson.unsafe.CompactPrinter
+import java.io.FileInputStream
+import java.util.zip.ZipInputStream
+import scala.collection.concurrent.TrieMap
+import scala.concurrent.Await
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
+import scala.util.Using
 
 object WartRemover extends sbt.AutoPlugin {
   override def trigger = allRequirements
@@ -381,6 +389,73 @@ object WartRemover extends sbt.AutoPlugin {
       )
     }.value
   )
+
+  private[this] def getAllClassNamesInJar(jar: File): List[String] = {
+    val suffix = ".class"
+    Using.resource(new ZipInputStream(new FileInputStream(jar))) { zip =>
+      Iterator
+        .continually(
+          zip.getNextEntry
+        )
+        .takeWhile(_ != null)
+        .filter(e => !e.isDirectory && e.getName.endsWith(suffix))
+        .map(
+          _.getName.replace('/', '.').dropRight(suffix.length)
+        )
+        .toList
+    }
+  }
+
+  private[this] case class WartCacheKey(scalaV: String, files: Set[String])
+
+  private[this] val wartRunCache: TrieMap[WartCacheKey, Future[Seq[Byte]]] = TrieMap.empty
+
+  private[this] def getJar(files: Set[String]): Def.Initialize[Task[Seq[Byte]]] = Def.task {
+    val key = WartCacheKey(
+      scalaV = (wartremoverInspectRun / scalaVersion).value,
+      files = files
+    )
+    val forkOps = (wartremoverInspectRun / forkOptions).value
+    val launcher = sbtLauncher(wartremoverInspectRun).value
+    val log = state.value.log
+
+    val res = wartRunCache.getOrElseUpdate(
+      key,
+      Future {
+        val buildSbt =
+          s"""
+             |logLevel := Level.Warn
+             |scalaVersion := "${key.scalaV}"
+             |crossPaths := false
+             |libraryDependencies := Seq(
+             |  "org.wartremover" %% "wartremover" % "${Wart.PluginVersion}"
+             |)
+             |""".stripMargin
+
+        IO.withTemporaryDirectory { dir =>
+          IO.write(dir / "build.sbt", buildSbt.getBytes(StandardCharsets.UTF_8))
+          key.files.toSeq.sorted.zipWithIndex.foreach { case (src, index) =>
+            IO.write(dir / s"${index}.scala", src.getBytes(StandardCharsets.UTF_8))
+          }
+          log.info(s"compile ${key.files.size} files")
+          val exitCode = Fork.java.apply(
+            forkOps.withWorkingDirectory(dir),
+            Seq(
+              "-jar",
+              launcher.getCanonicalPath,
+              packageBin.key.label
+            )
+          )
+          assert(exitCode == 0, s"exit code = $exitCode")
+          log.info(s"compiled ${key.files.size} files")
+          val Seq(compiledJar) = (dir / "target").listFiles(f => f.isFile && f.getName.endsWith(".jar")).toList
+          IO.readBytes(compiledJar).toSeq
+        }
+      }(ExecutionContext.global)
+    )
+
+    Await.result(res, 2.minutes)
+  }
 
   private[this] def getJarFiles(module: ModuleID): Def.Initialize[Task[Seq[File]]] = Def.task {
     dependencyResolution.value
