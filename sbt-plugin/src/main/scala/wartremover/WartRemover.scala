@@ -8,11 +8,9 @@ import sbt.*
 import sbt.Keys.*
 import sbt.SlashSyntax.HasSlashKey
 import sjsonnew.JsonFormat
-import sjsonnew.LNil
 import sjsonnew.support.scalajson.unsafe.CompactPrinter
 import wartremover.InspectArg.Type
 import java.io.FileInputStream
-import java.io.FileNotFoundException
 import java.net.URLClassLoader
 import java.util.zip.ZipInputStream
 import scala.annotation.tailrec
@@ -367,23 +365,21 @@ object WartRemover extends sbt.AutoPlugin {
 
   private[this] def inspectTask(x: Configuration): Seq[Def.Setting[?]] = Def.settings(
     x / wartremoverInspectOutputFile := None,
-    x / wartremoverInspectRun := {
-      Def.inputTaskDyn {
-        val parsed = InspectArgs.from(
-          InspectArgsParser.get(file(".").getAbsoluteFile.toPath).parsed
+    x / wartremoverInspectRun := Def.inputTaskDyn {
+      val parsed = InspectArgs.from(
+        InspectArgsParser.get(file(".").getAbsoluteFile.toPath).parsed
+      )
+      Def.taskDyn {
+        val errResult = compileWartFromSources(parsed(Type.Err)).value
+        val warnResult = compileWartFromSources(parsed(Type.Warn)).value
+        createInspectTask(
+          x = x,
+          warningWartNames = parsed(Type.Warn).warts ++ warnResult.wartNames,
+          errorWartNames = parsed(Type.Err).warts ++ errResult.wartNames,
+          jarFiles = errResult.jarBinary.toSeq ++ warnResult.jarBinary.toSeq,
         )
-        Def.taskDyn {
-          val errResult = compileWartFromSources(parsed(Type.Err)).value
-          val warnResult = compileWartFromSources(parsed(Type.Warn)).value
-          createInspectTask(
-            x = x,
-            warningWartNames = parsed(Type.Warn).warts ++ warnResult.wartNames,
-            errorWartNames = parsed(Type.Err).warts ++ errResult.wartNames,
-            jarFiles = errResult.jarBinary.toSeq ++ warnResult.jarBinary.toSeq,
-          )
-        }
-      }.evaluated
-    },
+      }
+    }.evaluated,
     x / wartremoverInspect := Def.taskDyn {
       createInspectTask(
         x = x,

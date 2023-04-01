@@ -15,10 +15,10 @@ class InspectArgsParserTest extends AnyFunSuite with EitherValues {
     new File(".").toPath,
     Function.const(true)
   )
-  private[this] def parse(input: String): Either[String, Seq[InspectArg]] =
+  private[this] def parse(input: String): Either[String, Seq[(InspectArg, Type)]] =
     Parser.parse(input, parser)
 
-  private[this] def r(input: String): Seq[InspectArg] =
+  private[this] def r(input: String): Seq[(InspectArg, Type)] =
     parse(input).value
 
   private[this] def l(input: String): String =
@@ -46,23 +46,23 @@ class InspectArgsParserTest extends AnyFunSuite with EitherValues {
     }
   }
   test("success") {
-    assert(r(" foo") == List(WartName("foo", Type.Warn)))
-    assert(r(" https://example.com") == List(Uri(uri("https://example.com"), Type.Warn)))
+    assert(r(" foo") == List(WartName("foo") -> Type.Warn))
+    assert(r(" https://example.com") == List(Uri(uri("https://example.com")) -> Type.Warn))
     assert(
       r(" --error https://example.com/1 https://example.com/2") ==
         List(
-          Uri(uri("https://example.com/1"), Type.Err),
-          Uri(uri("https://example.com/2"), Type.Err)
+          Uri(uri("https://example.com/1")) -> Type.Err,
+          Uri(uri("https://example.com/2")) -> Type.Err
         )
     )
 
     assert(
       r(" https://example.com/1 file://foo/bar  aaa.bbb https://example.com/2") ==
         List(
-          Uri(uri("https://example.com/1"), Type.Warn),
-          SourceFile(new File("/foo/bar").toPath, Type.Warn),
-          WartName("aaa.bbb", Type.Warn),
-          Uri(uri("https://example.com/2"), Type.Warn),
+          Uri(uri("https://example.com/1")) -> Type.Warn,
+          SourceFile(new File("/foo/bar").toPath) -> Type.Warn,
+          WartName("aaa.bbb") -> Type.Warn,
+          Uri(uri("https://example.com/2")) -> Type.Warn,
         )
     )
   }
