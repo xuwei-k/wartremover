@@ -11,6 +11,7 @@ import sbt.complete.Parser.token
 import sbt.complete.FileExamples
 import sbt.complete.DefaultParsers.*
 import sbt.io.GlobFilter
+import wartremover.InspectArg.Type
 import java.net.URI
 
 case class InspectArgs(
@@ -19,25 +20,51 @@ case class InspectArgs(
 )
 
 object InspectArgs {
-  def from(values: Seq[InspectArg]): InspectArgs = {
-    val sources = List.newBuilder[String]
-    val warts = List.newBuilder[Wart]
+  val empty: InspectArgs = InspectArgs(Nil, Nil)
+  def from(values: Seq[InspectArg]): Map[Type, InspectArgs] = {
+    val warnSources = List.newBuilder[String]
+    val warnWarts = List.newBuilder[Wart]
+    val errorSources = List.newBuilder[String]
+    val errorWarts = List.newBuilder[Wart]
     values.foreach {
       case x: InspectArg.FromSource =>
-        sources ++= x.getSourceContents
-      case InspectArg.WartName(value) =>
-        warts += Wart.custom(value)
+        x.tpe match {
+          case Type.Warn =>
+            warnSources ++= x.getSourceContents
+          case Type.Err =>
+            errorSources ++= x.getSourceContents
+        }
+      case x: InspectArg.WartName =>
+        x.tpe match {
+          case Type.Warn =>
+            warnWarts += Wart.custom(x.value)
+          case Type.Err =>
+            errorWarts += Wart.custom(x.value)
+        }
     }
-    InspectArgs(
-      sources = sources.result(),
-      warts = warts.result()
+    Map(
+      Type.Warn -> InspectArgs(
+        sources = warnSources.result(),
+        warts = warnWarts.result()
+      ),
+      Type.Err -> InspectArgs(
+        sources = errorSources.result(),
+        warts = errorWarts.result()
+      ),
     )
   }
 }
 
-private[wartremover] sealed abstract class InspectArg extends Product with Serializable
+private[wartremover] sealed abstract class InspectArg extends Product with Serializable {
+  def tpe: Type
+}
 
 private[wartremover] object InspectArg {
+  sealed abstract class Type extends Product with Serializable
+  object Type {
+    case object Err extends Type
+    case object Warn extends Type
+  }
   private[wartremover] sealed abstract class FromSource extends InspectArg {
     def getSourceContents: Seq[String]
   }
@@ -55,10 +82,10 @@ private[wartremover] object InspectArg {
     }
   }
 
-  final case class SourceFile(value: Path) extends FromSource {
+  final case class SourceFile(value: Path, tpe: Type) extends FromSource {
     def getSourceContents: Seq[String] = fromFile(value.toFile)
   }
-  final case class Uri(value: URI) extends FromSource {
+  final case class Uri(value: URI, tpe: Type) extends FromSource {
     def getSourceContents: Seq[String] = {
       value.getScheme match {
         case null =>
@@ -68,7 +95,7 @@ private[wartremover] object InspectArg {
       }
     }
   }
-  final case class WartName(value: String) extends InspectArg
+  final case class WartName(value: String, tpe: Type) extends InspectArg
 }
 
 /**
@@ -76,7 +103,17 @@ private[wartremover] object InspectArg {
  * [[https://github.com/scalacenter/sbt-scalafix/blob/2051bf05f79befc8db66/src/main/scala/scalafix/internal/sbt/ScalafixCompletions.scala]]
  */
 private[wartremover] object InspectArgsParser {
-  def get(workingDirectory: Path): Parser[Seq[InspectArg]] = {
+  private[this] val typeParser: Parser[Type] = {
+    val base: Parser[Type] =
+      token("--warn").map(_ => Type.Warn) | token("--error").map(_ => Type.Err)
+
+    base.?.map(_.getOrElse(Type.Warn))
+  }
+
+  def get(workingDirectory: Path): Parser[Map[Type, InspectArgs]] =
+    get0(workingDirectory).map(InspectArgs.from)
+
+  private def get0(workingDirectory: Path): Parser[Seq[InspectArg]] = {
     def toAbsolutePath(path: Path, cwd: Path): Path = {
       if (path.isAbsolute) path
       else cwd.resolve(path)
@@ -104,31 +141,44 @@ private[wartremover] object InspectArgsParser {
       }
     }
 
-    val f1: Parser[InspectArg] = (token("file:") ~> token(
-      StringBasic
-        .examples(new AbsolutePathExamples(workingDirectory))
-        .map { f =>
-          toAbsolutePath(Paths.get(f), workingDirectory)
-        }
-        .filter(f => Files.isDirectory(f) || (Files.isRegularFile(f) && f.toFile.getName.endsWith(".scala")), x => x)
-        .map(InspectArg.SourceFile)
-    ))
+    val f1: Parser[Seq[InspectArg]] = {
+      val f: Parser[InspectArg] = token(Space) ~> (typeParser ~ (token("file:") ~> token(
+        StringBasic
+          .examples(new AbsolutePathExamples(workingDirectory))
+          .map { f =>
+            toAbsolutePath(Paths.get(f), workingDirectory)
+          }
+          .filter(f => Files.isDirectory(f) || (Files.isRegularFile(f) && f.toFile.getName.endsWith(".scala")), x => x)
+      ))).map { case (tpe, x) =>
+        InspectArg.SourceFile(x, tpe)
+      }
+      f.*
+    }
 
-    (token(Space) ~> f1).* | f2 | f3
+    f1 | f2 | f3
   }
 
   private[this] val f2: Parser[Seq[InspectArg]] = {
-    (token(Space) ~> token(basicUri).examples("https://").map(InspectArg.Uri)).*
+    val examples = Seq(
+      "https://",
+      "https://raw.githubusercontent.com/",
+      "http://",
+    )
+    (token(Space) ~> (typeParser ~ token(basicUri).examples(examples *)).map { case (tpe, uri) =>
+      InspectArg.Uri(uri, tpe)
+    }).*
   }
 
   private[this] val f3: Parser[Seq[InspectArg]] =
-    distinctParser(_root_.wartremover.Warts.all.map(_.clazz).toSet).map(_.map(InspectArg.WartName))
+    distinctParser(_root_.wartremover.Warts.all.map(_.clazz).toSet)
 
-  private[this] def distinctParser(exs: Set[String]): Parser[Seq[String]] = {
-    val base = token(Space) ~> token(NotSpace examples exs)
+  private[this] def distinctParser(exs: Set[String]): Parser[Seq[InspectArg]] = {
+    val base = token(Space) ~> (typeParser ~ token(NotSpace examples exs)).map { case (tpe, wartName) =>
+      InspectArg.WartName(wartName, tpe)
+    }
     base.flatMap { ex =>
-      val (_, notMatching) = exs.partition(GlobFilter(ex).accept)
+      val (_, notMatching) = exs.partition(GlobFilter(ex.value).accept)
       distinctParser(notMatching).map { result => ex +: result }
-    } ?? Nil
+    } ?? Seq.empty[InspectArg]
   }
 }

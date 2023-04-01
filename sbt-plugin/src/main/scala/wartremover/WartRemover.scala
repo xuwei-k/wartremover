@@ -10,6 +10,7 @@ import sbt.SlashSyntax.HasSlashKey
 import sjsonnew.JsonFormat
 import sjsonnew.LNil
 import sjsonnew.support.scalajson.unsafe.CompactPrinter
+import wartremover.InspectArg.Type
 import java.io.FileInputStream
 import java.io.FileNotFoundException
 import java.net.URLClassLoader
@@ -368,82 +369,16 @@ object WartRemover extends sbt.AutoPlugin {
     x / wartremoverInspectOutputFile := None,
     x / wartremoverInspectRun := {
       Def.inputTaskDyn {
-        val parsed = InspectArgs.from(InspectArgsParser.get(file(".").getAbsoluteFile.toPath).parsed)
-
+        val parsed = InspectArgsParser.get(file(".").getAbsoluteFile.toPath).parsed
         Def.taskDyn {
-          val wartremoverJars = Def.taskDyn {
-            val wartremoverCross = wartremoverCrossVersion.value
-            Def.task(
-              getJarFiles(
-                "org.wartremover" %% "wartremover" % Wart.PluginVersion cross wartremoverCross
-              ).value
-            )
-          }.value
-          val log = streams.value.log
-          val sourceFiles = parsed.sources
-          Def.taskDyn[InspectResult] {
-            val (impl, jarBinary) = {
-              if (sourceFiles.nonEmpty) {
-                val bytes: Seq[Byte] = getJar(sourceFiles.toSet).value
-                IO.withTemporaryDirectory { tmpDir =>
-                  val compiledJar = tmpDir / "wartremover" / "warts.jar"
-                  IO.write(compiledJar, bytes.toArray)
-                  log.debug(s"compiled jar = $compiledJar")
-                  val classes = getAllClassNamesInJar(compiledJar)
-                  if (classes.isEmpty) {
-                    log.error("not found compiled classes")
-                    Nil -> None
-                  } else {
-                    log.info(s"compiled classes = ${classes.mkString(" ")}")
-                    val loader = new URLClassLoader(
-                      (compiledJar.toURI.toURL +: wartremoverJars.map(_.toURI.toURL)).toArray
-                    )
-                    val xs =
-                      try {
-                        classes.filter { className =>
-                          val clazz = Class.forName(className, false, loader)
-                          val traverserName = "org.wartremover.WartTraverser"
-
-                          @tailrec
-                          def loop(c: Class[?]): Boolean = {
-                            if (c == null) {
-                              false
-                            } else if (c.getName == traverserName) {
-                              true
-                            } else {
-                              loop(c.getSuperclass)
-                            }
-                          }
-
-                          loop(clazz)
-                        }.map { s =>
-                          if (s.endsWith("$")) s.dropRight(1) else s
-                        }
-                      } finally {
-                        loader.close()
-                      }
-
-                    xs -> Some(bytes)
-                  }
-                }
-              } else {
-                (Nil, None)
-              }
-            }
-            val all = impl.map(Wart.custom) ++ parsed.warts
-
-            if (all.isEmpty) {
-              log.error("not found WartTraverser implement classes")
-              Def.task(InspectResult.empty)
-            } else {
-              createInspectTask(
-                x = x,
-                warningWartNames = all,
-                errorWartNames = Nil,
-                jarFiles = jarBinary.toSeq,
-              )
-            }
-          }
+          val errResult = compileWartFromSources(parsed(Type.Err)).value
+          val warnResult = compileWartFromSources(parsed(Type.Warn)).value
+          createInspectTask(
+            x = x,
+            warningWartNames = parsed(Type.Warn).warts ++ warnResult.wartNames,
+            errorWartNames = parsed(Type.Err).warts ++ errResult.wartNames,
+            jarFiles = errResult.jarBinary.toSeq ++ warnResult.jarBinary.toSeq,
+          )
         }
       }.evaluated
     },
@@ -456,6 +391,75 @@ object WartRemover extends sbt.AutoPlugin {
       )
     }.value
   )
+
+  private final case class CompileResult(jarBinary: Option[Seq[Byte]], wartNames: Seq[Wart])
+  private object CompileResult {
+    val empty: CompileResult = CompileResult(None, Nil)
+  }
+
+  private[this] def compileWartFromSources(inspectArg: InspectArgs): Def.Initialize[Task[CompileResult]] = {
+    Def.taskDyn {
+      val log = streams.value.log
+      val wartremoverJars = Def.taskDyn {
+        val wartremoverCross = wartremoverCrossVersion.value
+        Def.task(
+          getJarFiles(
+            "org.wartremover" %% "wartremover" % Wart.PluginVersion cross wartremoverCross
+          ).value
+        )
+      }.value
+      if (inspectArg.sources.nonEmpty) {
+        val bytes: Seq[Byte] = getJar(inspectArg.sources.toSet).value
+        IO.withTemporaryDirectory { tmpDir =>
+          val compiledJar = tmpDir / "wartremover" / "warts.jar"
+          IO.write(compiledJar, bytes.toArray)
+          log.debug(s"compiled jar = $compiledJar")
+          val classes = getAllClassNamesInJar(compiledJar)
+          if (classes.isEmpty) {
+            log.error("not found compiled classes")
+            Def.task(CompileResult.empty)
+          } else {
+            log.info(s"compiled classes = ${classes.mkString(" ")}")
+            val loader = new URLClassLoader(
+              (compiledJar.toURI.toURL +: wartremoverJars.map(_.toURI.toURL)).toArray
+            )
+            val xs =
+              try {
+                classes.filter { className =>
+                  val clazz = Class.forName(className, false, loader)
+                  val traverserName = "org.wartremover.WartTraverser"
+
+                  @tailrec
+                  def loop(c: Class[?]): Boolean = {
+                    if (c == null) {
+                      false
+                    } else if (c.getName == traverserName) {
+                      true
+                    } else {
+                      loop(c.getSuperclass)
+                    }
+                  }
+
+                  loop(clazz)
+                }.map { s =>
+                  if (s.endsWith("$")) s.dropRight(1) else s
+                }
+              } finally {
+                loader.close()
+              }
+
+            Def.task(
+              CompileResult(jarBinary = Some(bytes), wartNames = xs.map(Wart.custom))
+            )
+          }
+        }
+      } else {
+        Def.task(
+          CompileResult.empty
+        )
+      }
+    }
+  }
 
   private[this] def getAllClassNamesInJar(jar: File): List[String] = {
     val suffix = ".class"
