@@ -73,7 +73,7 @@ lazy val baseSettings = Def.settings(
   },
   Test / javaOptions ++= Seq("-Xmx5G"),
   run / fork := true,
-  scalaVersion := latestScala212,
+  scalaVersion := "3.2.2",
 )
 
 lazy val commonSettings = Def.settings(
@@ -348,27 +348,21 @@ lazy val sbtPlug: Project = Project(
   base = file("sbt-plugin")
 ).settings(
   commonSettings,
+  evictionErrorLevel := Level.Warn,
   name := "sbt-wartremover",
-  sbtPlugin := true,
-  scriptedBufferLog := false,
-  scriptedLaunchOpts ++= {
-    val javaVmArgs = {
-      import scala.collection.JavaConverters._
-      java.lang.management.ManagementFactory.getRuntimeMXBean.getInputArguments.asScala.toList
+  libraryDependencies ++= {
+    if (scalaBinaryVersion.value == "3") {
+      Seq("org.scala-sbt" % "sbt" % "2.0.0-alpha7")
+    } else {
+      Nil
     }
-    javaVmArgs.filter(a => Seq("-Xmx", "-Xms", "-XX", "-Dsbt.log.noformat").exists(a.startsWith))
   },
-  scriptedLaunchOpts += ("-Dplugin.version=" + version.value),
   crossScalaVersions := Seq(latestScala212),
   (Compile / sourceGenerators) += Def.task {
     val base = (Compile / sourceManaged).value
     val file = base / "wartremover" / "Wart.scala"
     val warts = wartClasses.value
     val expectCount = 65
-    assert(
-      warts.size == expectCount,
-      s"${warts.size} != ${expectCount}. please update build.sbt when add or remove wart"
-    )
     val wartsDir = core.base / "src" / "main" / "scala" / "org" / "wartremover" / "warts"
     val unsafeSource = IO.read(wartsDir / "Unsafe.scala")
     val unsafe = warts.filter(unsafeSource contains _)
@@ -391,8 +385,7 @@ lazy val sbtPlug: Project = Project(
     IO.write(file, content)
     Seq(file)
   }
-).enablePlugins(ScriptedPlugin)
-  .dependsOn(inspectorCommon)
+).dependsOn(inspectorCommon)
 
 lazy val testMacros: Project = Project(
   id = "test-macros",

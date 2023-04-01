@@ -178,7 +178,7 @@ object WartRemover extends sbt.AutoPlugin {
 
   private[this] implicit val inspectParamFormat: JsonFormat[InspectParam] = {
     import sjsonnew.BasicJsonProtocol.*
-    caseClass8(InspectParam, InspectParam.unapply)(
+    caseClass8(InspectParam.apply, x => Some(Tuple.fromProductTyped(x)))(
       "tastyFiles",
       "dependenciesClasspath",
       "wartClasspath",
@@ -194,7 +194,7 @@ object WartRemover extends sbt.AutoPlugin {
     import sjsonnew.BasicJsonProtocol.*
 
     implicit val positionInstance: JsonFormat[org.wartremover.Position] =
-      caseClass8(org.wartremover.Position, org.wartremover.Position.unapply)(
+      caseClass8(org.wartremover.Position.apply, x => Some(Tuple.fromProductTyped(x)))(
         "start",
         "startLine",
         "startColumn",
@@ -206,13 +206,13 @@ object WartRemover extends sbt.AutoPlugin {
       )
 
     implicit val diagnosticInstance: JsonFormat[org.wartremover.Diagnostic] =
-      caseClass3(org.wartremover.Diagnostic, org.wartremover.Diagnostic.unapply)(
+      caseClass3(org.wartremover.Diagnostic.apply, x => Some(Tuple.fromProductTyped(x)))(
         "message",
         "wart",
         "position",
       )
 
-    caseClass2(InspectResult.apply, InspectResult.unapply)(
+    caseClass2(InspectResult.apply, x => Some(Tuple.fromProductTyped(x)))(
       "errors",
       "warnings",
     )
@@ -479,23 +479,6 @@ object WartRemover extends sbt.AutoPlugin {
 
   // Workaround for https://github.com/wartremover/wartremover/issues/123
   private[wartremover] def derive[T](s: Setting[T]): Setting[T] = {
-    try {
-      Def derive s
-    } catch {
-      case _: LinkageError =>
-        import scala.language.reflectiveCalls
-        Def
-          .asInstanceOf[{
-              def derive[T](
-                setting: Setting[T],
-                allowDynamic: Boolean,
-                filter: Scope => Boolean,
-                trigger: AttributeKey[_] => Boolean,
-                default: Boolean
-              ): Setting[T]
-            }
-          ]
-          .derive(s, false, _ => true, _ => true, false)
-    }
+    Def derive s
   }
 }
