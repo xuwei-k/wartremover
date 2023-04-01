@@ -10,7 +10,6 @@ import sbt.complete.Parser
 import sbt.complete.Parser.token
 import sbt.complete.FileExamples
 import sbt.complete.DefaultParsers.*
-import sbt.io.GlobFilter
 import wartremover.InspectArg.Type
 import java.net.URI
 
@@ -122,7 +121,9 @@ private[wartremover] object InspectArgsParser {
       self.filter(!_.startsWith("--"), x => x)
   }
 
-  def get(workingDirectory: Path): Parser[Seq[InspectArg]] = {
+  def get(workingDirectory: Path): Parser[Seq[InspectArg]] =
+    get(workingDirectory, p => Files.exists(p))
+  def get(workingDirectory: Path, pathFilter: Path => Boolean): Parser[Seq[InspectArg]] = {
     def toAbsolutePath(path: Path, cwd: Path): Path = {
       if (path.isAbsolute) path
       else cwd.resolve(path)
@@ -156,7 +157,7 @@ private[wartremover] object InspectArgsParser {
         .map { f =>
           toAbsolutePath(Paths.get(f), workingDirectory)
         }
-        .filter(f => Files.exists(f), x => x)
+        .filter(pathFilter, x => x)
     )).map { x =>
       InspectArg.SourceFile(x, Type.Empty)
     }
@@ -186,13 +187,4 @@ private[wartremover] object InspectArgsParser {
         InspectArg.WartName(wartName, Type.Empty)
     }
 
-  private[this] def distinctParser(exs: Set[String]): Parser[Seq[InspectArg]] = {
-    val base = token(Space) ~> (typeParser ~ token(NotSpace examples exs)).map { case (tpe, wartName) =>
-      InspectArg.WartName(wartName, tpe)
-    }
-    base.flatMap { ex =>
-      val (_, notMatching) = exs.partition(GlobFilter(ex.value).accept)
-      distinctParser(notMatching).map { result => ex +: result }
-    } ?? Seq.empty[InspectArg]
-  }
 }
