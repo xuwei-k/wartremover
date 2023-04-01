@@ -28,6 +28,16 @@ class InspectArgsParserTest extends AnyFunSuite with EitherValues {
     assert(l("no_space").startsWith("Expected whitespace character"))
     assert(l(" --error").startsWith("Expected whitespace character"))
   }
+  test("only '--'") {
+    val x = l(" -- ")
+    Seq(
+      "Expected '--warn'",
+      "Expected '--error'",
+      "Expected non-whitespace character",
+    ).foreach { e =>
+      assert(x.contains(e))
+    }
+  }
   val expectToken = Seq("file:", "https://", "http://", "non-whitespace character")
   test("empty after '--error' or '--warn'") {
     val x1 = l(" --error ")
