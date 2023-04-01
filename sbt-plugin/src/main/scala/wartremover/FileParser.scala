@@ -57,6 +57,7 @@ object InspectArgs {
 
 private[wartremover] sealed abstract class InspectArg extends Product with Serializable {
   def tpe: Type
+  def withType(tpe: Type): InspectArg
 }
 
 private[wartremover] object InspectArg {
@@ -64,11 +65,12 @@ private[wartremover] object InspectArg {
   object Type {
     case object Err extends Type
     case object Warn extends Type
+    case object Empty extends Type
   }
   private[wartremover] sealed abstract class FromSource extends InspectArg {
     def getSourceContents: Seq[String]
   }
-  def fromFile(x: File): Seq[String] = {
+  private def fromFile(x: File): Seq[String] = {
     if (x.isFile) {
       scala.io.Source.fromFile(x)(scala.io.Codec.UTF8).getLines().mkString("\n") :: Nil
     } else if (x.isDirectory) {
@@ -84,6 +86,8 @@ private[wartremover] object InspectArg {
 
   final case class SourceFile(value: Path, tpe: Type) extends FromSource {
     def getSourceContents: Seq[String] = fromFile(value.toFile)
+
+    def withType(tpe: Type): InspectArg = copy(tpe = tpe)
   }
   final case class Uri(value: URI, tpe: Type) extends FromSource {
     def getSourceContents: Seq[String] = {
@@ -94,8 +98,11 @@ private[wartremover] object InspectArg {
           scala.io.Source.fromURL(value.toURL)(scala.io.Codec.UTF8).getLines().mkString("\n") :: Nil
       }
     }
+    def withType(tpe: Type): InspectArg = copy(tpe = tpe)
   }
-  final case class WartName(value: String, tpe: Type) extends InspectArg
+  final case class WartName(value: String, tpe: Type) extends InspectArg {
+    def withType(tpe: Type): InspectArg = copy(tpe = tpe)
+  }
 }
 
 /**
@@ -105,15 +112,17 @@ private[wartremover] object InspectArg {
 private[wartremover] object InspectArgsParser {
   private[this] val typeParser: Parser[Type] = {
     val base: Parser[Type] =
-      token("--warn").map(_ => Type.Warn) | token("--error").map(_ => Type.Err)
+      Space ~> (token("--warn").map(_ => Type.Warn) | token("--error").map(_ => Type.Err))
 
     base.?.map(_.getOrElse(Type.Warn))
   }
 
-  def get(workingDirectory: Path): Parser[Map[Type, InspectArgs]] =
-    get0(workingDirectory).map(InspectArgs.from)
+  private implicit class ParserOps(private val self: Parser[String]) extends AnyVal {
+    def doNotParserTypeArgs: Parser[String] =
+      self.filter(!_.startsWith("--"), x => x)
+  }
 
-  private def get0(workingDirectory: Path): Parser[Seq[InspectArg]] = {
+  def get(workingDirectory: Path): Parser[Seq[InspectArg]] = {
     def toAbsolutePath(path: Path, cwd: Path): Path = {
       if (path.isAbsolute) path
       else cwd.resolve(path)
@@ -141,36 +150,41 @@ private[wartremover] object InspectArgsParser {
       }
     }
 
-    val f1: Parser[Seq[InspectArg]] = {
-      val f: Parser[InspectArg] = token(Space) ~> (typeParser ~ (token("file:") ~> token(
-        StringBasic
-          .examples(new AbsolutePathExamples(workingDirectory))
-          .map { f =>
-            toAbsolutePath(Paths.get(f), workingDirectory)
-          }
-          .filter(f => Files.isDirectory(f) || (Files.isRegularFile(f) && f.toFile.getName.endsWith(".scala")), x => x)
-      ))).map { case (tpe, x) =>
-        InspectArg.SourceFile(x, tpe)
-      }
-      f.*
+    val f1: Parser[InspectArg] = token(Space) ~> (token("file:") ~> token(
+      StringBasic.doNotParserTypeArgs
+        .examples(new AbsolutePathExamples(workingDirectory))
+        .map { f =>
+          toAbsolutePath(Paths.get(f), workingDirectory)
+        }
+        .filter(f => Files.exists(f), x => x)
+    )).map { x =>
+      InspectArg.SourceFile(x, Type.Empty)
     }
 
-    f1 | f2 | f3
+    (typeParser ~ (f1 | f2 | f3).+).+.map {
+      _.flatMap { case (tpe, values) =>
+        values.map(_.withType(tpe))
+      }
+    }
   }
 
-  private[this] val f2: Parser[Seq[InspectArg]] = {
+  private[this] val f2: Parser[InspectArg] = {
     val examples = Seq(
       "https://",
       "https://raw.githubusercontent.com/",
       "http://",
     )
-    (token(Space) ~> (typeParser ~ token(basicUri).examples(examples *)).map { case (tpe, uri) =>
-      InspectArg.Uri(uri, tpe)
-    }).*
+    val head = examples.map(token(_)).reduceLeft(_ | _)
+    token(Space) ~> (head ~ token(URIClass)).examples(examples *).map { case (p, uri) =>
+      InspectArg.Uri(new URI(s"${p}${uri}"), Type.Empty)
+    }
   }
 
-  private[this] val f3: Parser[Seq[InspectArg]] =
-    distinctParser(_root_.wartremover.Warts.all.map(_.clazz).toSet)
+  private[this] val f3: Parser[InspectArg] =
+    token(Space) ~> token(NotSpace examples _root_.wartremover.Warts.all.map(_.clazz).toSet).doNotParserTypeArgs.map {
+      wartName =>
+        InspectArg.WartName(wartName, Type.Empty)
+    }
 
   private[this] def distinctParser(exs: Set[String]): Parser[Seq[InspectArg]] = {
     val base = token(Space) ~> (typeParser ~ token(NotSpace examples exs)).map { case (tpe, wartName) =>

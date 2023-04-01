@@ -369,7 +369,9 @@ object WartRemover extends sbt.AutoPlugin {
     x / wartremoverInspectOutputFile := None,
     x / wartremoverInspectRun := {
       Def.inputTaskDyn {
-        val parsed = InspectArgsParser.get(file(".").getAbsoluteFile.toPath).parsed
+        val parsed = InspectArgs.from(
+          InspectArgsParser.get(file(".").getAbsoluteFile.toPath).parsed
+        )
         Def.taskDyn {
           val errResult = compileWartFromSources(parsed(Type.Err)).value
           val warnResult = compileWartFromSources(parsed(Type.Warn)).value
