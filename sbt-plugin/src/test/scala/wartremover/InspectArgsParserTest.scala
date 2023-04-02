@@ -93,13 +93,13 @@ class InspectArgsParserTest extends AnyFunSuite with EitherValues with BeforeAnd
     )
 
     assert(
-      r(" https://example.com/1 file://foo/bar --fail-if-wart-load-error=true aaa.bbb --error https://example.com/2") ==
+      r(" https://example.com/1 file://foo/bar --error https://example.com/2 aaa.bbb --fail-if-wart-load-error=true") ==
         List(
           InspectArg.Wart(Uri(uri("https://example.com/1")), Type.Warn),
           InspectArg.Wart(SourceFile(new File("/foo/bar").toPath), Type.Warn),
-          InspectArg.FailIfWartLoadError(true),
-          InspectArg.Wart(WartName("aaa.bbb"), Type.Warn),
           InspectArg.Wart(Uri(uri("https://example.com/2")), Type.Err),
+          InspectArg.Wart(WartName("aaa.bbb"), Type.Err),
+          InspectArg.FailIfWartLoadError(true),
         )
     )
   }
@@ -121,9 +121,6 @@ class InspectArgsParserTest extends AnyFunSuite with EitherValues with BeforeAnd
         "p:// ",
         "ps:// ",
         "ps://raw.githubusercontent.com/ ",
-        "p://  ",
-        "ps://  ",
-        "ps://raw.githubusercontent.com/  ",
       )
     )
 
@@ -228,7 +225,6 @@ class InspectArgsParserTest extends AnyFunSuite with EitherValues with BeforeAnd
       Set(
         "",
         " ",
-        "  ",
         "./dir_1",
         "./dir_1/file_1.scala",
         "./dir_1/file_2.scala",

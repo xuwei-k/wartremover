@@ -69,11 +69,15 @@ private[wartremover] object InspectArgsParser {
       InspectWart.SourceFile(x)
     }
 
-    ((typeParser ~ (f1 | f2 | f3).+).+.map {
+    val f5 = f4.?.map(_.toSeq)
+
+    val f6 = (typeParser ~ (f1 | f2 | f3).+).*.map { // TODO avoid `*` ?
       _.flatMap { case (tpe, values) =>
         values.map(x => InspectArg.Wart(value = x, tpe = tpe))
       }
-    } | f4.?.map(_.toSeq)).+.map(_.flatten)
+    }
+
+    (f5 ~ f6 ~ f5).map { case x1 ~ x2 ~ x3 => Seq(x1, x2, x3).flatten }
   }
 
   private[this] val f2: Parser[InspectWart] = {
