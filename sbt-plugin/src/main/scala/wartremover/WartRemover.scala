@@ -9,7 +9,7 @@ import sbt.Keys.*
 import sbt.SlashSyntax.HasSlashKey
 import sjsonnew.JsonFormat
 import sjsonnew.support.scalajson.unsafe.CompactPrinter
-import wartremover.InspectArg.Type
+import wartremover.InspectWart.Type
 import java.io.FileInputStream
 import java.net.URLClassLoader
 import java.util.zip.ZipInputStream
@@ -253,9 +253,10 @@ object WartRemover extends sbt.AutoPlugin {
   private[this] def inspectTask(x: Configuration): Seq[Def.Setting[?]] = Def.settings(
     x / wartremoverInspectOutputFile := None,
     x / wartremover := Def.inputTaskDyn {
-      val parsed = InspectArgs.from(
-        InspectArgsParser.get(file(".").getAbsoluteFile.toPath).parsed
-      )
+      val parsed0 = InspectArgsParser.get(file(".").getAbsoluteFile.toPath).parsed
+      val parsed = InspectArgs.from(parsed0.collect { case x: InspectArg.Wart =>
+        x
+      })
       Def.taskDyn {
         val errResult = compileWartFromSources(parsed(Type.Err)).value
         val warnResult = compileWartFromSources(parsed(Type.Warn)).value
@@ -264,6 +265,11 @@ object WartRemover extends sbt.AutoPlugin {
           warningWartNames = parsed(Type.Warn).warts ++ warnResult.wartNames,
           errorWartNames = parsed(Type.Err).warts ++ errResult.wartNames,
           jarFiles = errResult.jarBinary.toSeq ++ warnResult.jarBinary.toSeq,
+          failIfWartLoadError = parsed0.collectFirst { case InspectArg.FailIfWartLoadError(a) =>
+            a
+          }.getOrElse {
+            (x / wartremoverFailIfWartLoadError).value
+          }
         )
       }
     }.evaluated,
@@ -273,6 +279,7 @@ object WartRemover extends sbt.AutoPlugin {
         warningWartNames = (x / wartremoverInspect / wartremoverWarnings).value,
         errorWartNames = (x / wartremoverInspect / wartremoverErrors).value,
         jarFiles = Nil,
+        failIfWartLoadError = (x / wartremoverFailIfWartLoadError).value,
       )
     }.value
   )
@@ -416,6 +423,7 @@ object WartRemover extends sbt.AutoPlugin {
     errorWartNames: Seq[Wart],
     warningWartNames: Seq[Wart],
     jarFiles: Seq[Seq[Byte]],
+    failIfWartLoadError: Boolean,
   ): Def.Initialize[Task[InspectResult]] = Def.taskDyn {
     val log = streams.value.log
     val myProject = thisProjectRef.value

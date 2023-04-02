@@ -5,20 +5,21 @@ import org.scalatest.funsuite.AnyFunSuite
 import java.io.File
 import sbt.complete.Parser
 import sbt.uri
-import wartremover.InspectArg.SourceFile
-import wartremover.InspectArg.Type
-import wartremover.InspectArg.Uri
-import wartremover.InspectArg.WartName
+import wartremover.InspectArg.FailIfWartLoadError
+import wartremover.InspectWart.SourceFile
+import wartremover.InspectWart.Type
+import wartremover.InspectWart.Uri
+import wartremover.InspectWart.WartName
 
 class InspectArgsParserTest extends AnyFunSuite with EitherValues {
   private[this] val parser = InspectArgsParser.get(
-    new File(".").toPath,
-    Function.const(true)
+    workingDirectory = new File(".").toPath,
+    pathFilter = Function.const(true)
   )
-  private[this] def parse(input: String): Either[String, Seq[(InspectArg, Type)]] =
+  private[this] def parse(input: String): Either[String, Seq[InspectArg]] =
     Parser.parse(input, parser)
 
-  private[this] def r(input: String): Seq[(InspectArg, Type)] =
+  private[this] def r(input: String): Seq[InspectArg] =
     parse(input).value
 
   private[this] def l(input: String): String =
@@ -27,6 +28,7 @@ class InspectArgsParserTest extends AnyFunSuite with EitherValues {
   test("failure") {
     assert(l("no_space").startsWith("Expected whitespace character"))
     assert(l(" --error").startsWith("Expected whitespace character"))
+    assert(parse(" --fail-if-wart-load-error=invalid").isLeft)
   }
   test("only '--'") {
     val x = l(" -- ")
@@ -56,23 +58,26 @@ class InspectArgsParserTest extends AnyFunSuite with EitherValues {
     }
   }
   test("success") {
-    assert(r(" foo") == List(WartName("foo") -> Type.Warn))
-    assert(r(" https://example.com") == List(Uri(uri("https://example.com")) -> Type.Warn))
+    assert(r(" --fail-if-wart-load-error=true") == List(FailIfWartLoadError(true)))
+    assert(r(" --fail-if-wart-load-error=false") == List(FailIfWartLoadError(false)))
+    assert(r(" foo") == List(InspectArg.Wart(WartName("foo"), Type.Warn)))
+    assert(r(" https://example.com") == List(InspectArg.Wart(Uri(uri("https://example.com")), Type.Warn)))
     assert(
       r(" --error https://example.com/1 https://example.com/2") ==
         List(
-          Uri(uri("https://example.com/1")) -> Type.Err,
-          Uri(uri("https://example.com/2")) -> Type.Err
+          InspectArg.Wart(Uri(uri("https://example.com/1")), Type.Err),
+          InspectArg.Wart(Uri(uri("https://example.com/2")), Type.Err)
         )
     )
 
     assert(
-      r(" https://example.com/1 file://foo/bar  aaa.bbb https://example.com/2") ==
+      r(" https://example.com/1 file://foo/bar --fail-if-wart-load-error=true aaa.bbb --error https://example.com/2") ==
         List(
-          Uri(uri("https://example.com/1")) -> Type.Warn,
-          SourceFile(new File("/foo/bar").toPath) -> Type.Warn,
-          WartName("aaa.bbb") -> Type.Warn,
-          Uri(uri("https://example.com/2")) -> Type.Warn,
+          InspectArg.Wart(Uri(uri("https://example.com/1")), Type.Warn),
+          InspectArg.Wart(SourceFile(new File("/foo/bar").toPath), Type.Warn),
+          InspectArg.FailIfWartLoadError(true),
+          InspectArg.Wart(WartName("aaa.bbb"), Type.Warn),
+          InspectArg.Wart(Uri(uri("https://example.com/2")), Type.Err),
         )
     )
   }

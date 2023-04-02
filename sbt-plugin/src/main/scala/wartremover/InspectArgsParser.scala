@@ -8,7 +8,7 @@ import sbt.complete.Parser
 import sbt.complete.Parser.token
 import sbt.complete.FileExamples
 import sbt.complete.DefaultParsers.*
-import wartremover.InspectArg.Type
+import wartremover.InspectWart.Type
 import java.net.URI
 
 /**
@@ -28,9 +28,9 @@ private[wartremover] object InspectArgsParser {
       self.filter(!_.startsWith("--"), x => x)
   }
 
-  def get(workingDirectory: Path): Parser[Seq[(InspectArg, Type)]] =
+  def get(workingDirectory: Path): Parser[Seq[InspectArg]] =
     get(workingDirectory, p => Files.exists(p))
-  def get(workingDirectory: Path, pathFilter: Path => Boolean): Parser[Seq[(InspectArg, Type)]] = {
+  def get(workingDirectory: Path, pathFilter: Path => Boolean): Parser[Seq[InspectArg]] = {
     def toAbsolutePath(path: Path, cwd: Path): Path = {
       if (path.isAbsolute) path
       else cwd.resolve(path)
@@ -58,7 +58,7 @@ private[wartremover] object InspectArgsParser {
       }
     }
 
-    val f1: Parser[InspectArg] = token(Space) ~> (token("file:") ~> token(
+    val f1: Parser[InspectWart] = token(Space) ~> (token("file:") ~> token(
       StringBasic.doNotParserTypeArgs
         .examples(new AbsolutePathExamples(workingDirectory))
         .map { f =>
@@ -66,17 +66,17 @@ private[wartremover] object InspectArgsParser {
         }
         .filter(pathFilter, x => x)
     )).map { x =>
-      InspectArg.SourceFile(x)
+      InspectWart.SourceFile(x)
     }
 
-    (typeParser ~ (f1 | f2 | f3).+).+.map {
+    ((typeParser ~ (f1 | f2 | f3).+).+.map {
       _.flatMap { case (tpe, values) =>
-        values.map(_ -> tpe)
+        values.map(x => InspectArg.Wart(value = x, tpe = tpe))
       }
-    }
+    } | f4.?.map(_.toSeq)).+.map(_.flatten)
   }
 
-  private[this] val f2: Parser[InspectArg] = {
+  private[this] val f2: Parser[InspectWart] = {
     val examples = Seq(
       "https://",
       "https://raw.githubusercontent.com/",
@@ -84,14 +84,16 @@ private[wartremover] object InspectArgsParser {
     )
     val head = examples.map(token(_)).reduceLeft(_ | _)
     token(Space) ~> (head ~ token(URIClass)).examples(examples *).map { case (p, uri) =>
-      InspectArg.Uri(new URI(s"${p}${uri}"))
+      InspectWart.Uri(new URI(s"${p}${uri}"))
     }
   }
 
-  private[this] val f3: Parser[InspectArg] =
+  private[this] val f3: Parser[InspectWart] =
     token(Space) ~> token(NotSpace examples _root_.wartremover.Warts.all.map(_.clazz).toSet).doNotParserTypeArgs.map {
       wartName =>
-        InspectArg.WartName(wartName)
+        InspectWart.WartName(wartName)
     }
 
+  private[this] val f4: Parser[InspectArg] =
+    (token(Space) ~> token("--fail-if-wart-load-error=") ~> Bool).map(InspectArg.FailIfWartLoadError)
 }

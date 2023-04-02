@@ -1,6 +1,6 @@
 package wartremover
 
-import wartremover.InspectArg.Type
+import wartremover.InspectWart.Type
 
 private[wartremover] case class InspectArgs(
   sources: Seq[String],
@@ -8,19 +8,19 @@ private[wartremover] case class InspectArgs(
 )
 
 private[wartremover] object InspectArgs {
-  def from(values: Seq[(InspectArg, Type)]): Map[Type, InspectArgs] = {
+  def from(values: Seq[InspectArg.Wart]): Map[Type, InspectArgs] = {
     val warnSources = List.newBuilder[String]
     val warnWarts = List.newBuilder[Wart]
     val errorSources = List.newBuilder[String]
     val errorWarts = List.newBuilder[Wart]
     values.foreach {
-      case (x: InspectArg.FromSource, Type.Warn) =>
+      case InspectArg.Wart(x: InspectWart.FromSource, Type.Warn) =>
         warnSources ++= x.getSourceContents()
-      case (x: InspectArg.FromSource, Type.Err) =>
+      case InspectArg.Wart(x: InspectWart.FromSource, Type.Err) =>
         errorSources ++= x.getSourceContents()
-      case (x: InspectArg.WartName, Type.Warn) =>
+      case InspectArg.Wart(x: InspectWart.WartName, Type.Warn) =>
         warnWarts += Wart.custom(x.value)
-      case (x: InspectArg.WartName, Type.Err) =>
+      case InspectArg.Wart(x: InspectWart.WartName, Type.Err) =>
         errorWarts += Wart.custom(x.value)
     }
     Map(

@@ -10,12 +10,20 @@ import scala.io.Source
 private[wartremover] sealed abstract class InspectArg extends Product with Serializable
 
 private[wartremover] object InspectArg {
+  case class Wart(value: InspectWart, tpe: InspectWart.Type) extends InspectArg
+
+  case class FailIfWartLoadError(value: Boolean) extends InspectArg
+
+}
+private[wartremover] sealed abstract class InspectWart extends Product with Serializable
+
+private[wartremover] object InspectWart {
   sealed abstract class Type extends Product with Serializable
   object Type {
     case object Err extends Type
     case object Warn extends Type
   }
-  private[wartremover] sealed abstract class FromSource extends InspectArg {
+  private[wartremover] sealed abstract class FromSource extends InspectWart {
     def getSourceContents(): Seq[String]
   }
   private def fromFile(x: File): Seq[String] = {
@@ -46,5 +54,6 @@ private[wartremover] object InspectArg {
       }
     }
   }
-  final case class WartName(value: String) extends InspectArg
+  final case class WartName(value: String) extends InspectWart
+
 }
