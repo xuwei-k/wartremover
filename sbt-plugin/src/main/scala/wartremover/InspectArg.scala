@@ -16,7 +16,7 @@ private[wartremover] object InspectArg {
     case object Warn extends Type
   }
   private[wartremover] sealed abstract class FromSource extends InspectArg {
-    def getSourceContents: Seq[String]
+    def getSourceContents(): Seq[String]
   }
   private def fromFile(x: File): Seq[String] = {
     if (x.isFile) {
@@ -33,11 +33,11 @@ private[wartremover] object InspectArg {
   }
 
   final case class SourceFile(value: Path) extends FromSource {
-    def getSourceContents: Seq[String] = fromFile(value.toFile)
+    def getSourceContents(): Seq[String] = fromFile(value.toFile)
 
   }
   final case class Uri(value: URI) extends FromSource {
-    def getSourceContents: Seq[String] = {
+    def getSourceContents(): Seq[String] = {
       value.getScheme match {
         case null =>
           fromFile(file(value.toString))
