@@ -23,11 +23,13 @@ import scala.util.Using
 
 object WartRemover extends sbt.AutoPlugin {
   override def trigger = allRequirements
+
+  val wartremover = inputKey[InspectResult]("run wartremover by TASTy inspector")
+
   object autoImport {
     val WartremoverTag = Tags.Tag("wartremover")
     val wartremoverFailIfWartLoadError = settingKey[Boolean]("")
     val wartremoverInspect = taskKey[InspectResult]("run wartremover by TASTy inspector")
-    val wartremover = inputKey[InspectResult]("run wartremover by TASTy inspector")
     val wartremoverInspectOutputFile = settingKey[Option[File]]("")
     val wartremoverInspectOutputStandardReporter = settingKey[Boolean]("")
     val wartremoverInspectFailOnErrors = settingKey[Boolean]("")
