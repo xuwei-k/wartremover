@@ -41,10 +41,10 @@ class InspectArgsParserTest extends AnyFunSuite with EitherValues with BeforeAnd
   private[this] def parse(input: String): Either[String, Seq[InspectArg]] =
     Parser.parse(input, parser)
 
-  private[this] def r(input: String): Seq[InspectArg] =
+  private[this] def r(input: String)(implicit p: Position): Seq[InspectArg] =
     parse(input).value
 
-  private[this] def l(input: String): String =
+  private[this] def l(input: String)(implicit p: Position): String =
     parse(input).left.value
 
   test("failure") {

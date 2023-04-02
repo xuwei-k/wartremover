@@ -24,7 +24,7 @@ private[wartremover] object InspectArgsParser {
   }
 
   private implicit class ParserOps(private val self: Parser[String]) extends AnyVal {
-    def doNotParserTypeArgs: Parser[String] =
+    def doNotParseSpecialArgs: Parser[String] =
       self.filter(!_.startsWith("--"), x => x)
   }
 
@@ -59,7 +59,7 @@ private[wartremover] object InspectArgsParser {
     }
 
     val f1: Parser[InspectWart] = token(Space) ~> (token("file:") ~> token(
-      StringBasic.doNotParserTypeArgs
+      StringBasic.doNotParseSpecialArgs
         .examples(new AbsolutePathExamples(workingDirectory))
         .map { f =>
           toAbsolutePath(Paths.get(f), workingDirectory)
@@ -89,7 +89,7 @@ private[wartremover] object InspectArgsParser {
   }
 
   private[this] val f3: Parser[InspectWart] =
-    token(Space) ~> token(NotSpace examples _root_.wartremover.Warts.all.map(_.clazz).toSet).doNotParserTypeArgs.map {
+    token(Space) ~> token(NotSpace examples _root_.wartremover.Warts.all.map(_.clazz).toSet).doNotParseSpecialArgs.map {
       wartName =>
         InspectWart.WartName(wartName)
     }
