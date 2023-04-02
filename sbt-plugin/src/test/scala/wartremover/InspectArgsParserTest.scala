@@ -181,15 +181,13 @@ class InspectArgsParserTest extends AnyFunSuite with EitherValues {
 
     f(" --w", Set("--warn"))
 
-    f(" --f", Set("--fail-if-wart-load-error="))
+    f(
+      " --f",
+      Set("--fail-if-wart-load-error=true", "--fail-if-wart-load-error=false")
+    )
     f(
       " --fail-if-wart-load-error=",
-      Set(
-        "true",
-        "false",
-        "true ",
-        "false ",
-      )
+      Set("--fail-if-wart-load-error=true", "--fail-if-wart-load-error=false")
     )
 
     f(

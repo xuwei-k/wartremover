@@ -95,5 +95,10 @@ private[wartremover] object InspectArgsParser {
     }
 
   private[this] val f4: Parser[InspectArg] =
-    (token(Space) ~> token("--fail-if-wart-load-error=") ~> Bool).map(InspectArg.FailIfWartLoadError)
+    token(Space) ~> {
+      val t = token("--fail-if-wart-load-error=true") ^^^ InspectArg.FailIfWartLoadError(true)
+      val f = token("--fail-if-wart-load-error=false") ^^^ InspectArg.FailIfWartLoadError(false)
+
+      t | f
+    }
 }
