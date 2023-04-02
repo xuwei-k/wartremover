@@ -27,7 +27,7 @@ object WartRemover extends sbt.AutoPlugin {
     val WartremoverTag = Tags.Tag("wartremover")
     val wartremoverFailIfWartLoadError = settingKey[Boolean]("")
     val wartremoverInspect = taskKey[InspectResult]("run wartremover by TASTy inspector")
-    val wartremoverInspectRun = inputKey[InspectResult]("run wartremover by TASTy inspector")
+    val wartremover = inputKey[InspectResult]("run wartremover by TASTy inspector")
     val wartremoverInspectOutputFile = settingKey[Option[File]]("")
     val wartremoverInspectOutputStandardReporter = settingKey[Boolean]("")
     val wartremoverInspectFailOnErrors = settingKey[Boolean]("")
@@ -40,8 +40,8 @@ object WartRemover extends sbt.AutoPlugin {
     val wartremoverCrossVersion = settingKey[CrossVersion]("CrossVersion setting for wartremover")
     val wartremoverDependencies = settingKey[Seq[ModuleID]]("List of dependencies for custom Warts")
     val wartremoverPluginJarsDir = settingKey[Option[File]]("workaround for https://github.com/sbt/sbt/issues/6027")
-    val Wart = wartremover.Wart
-    val Warts = wartremover.Warts
+    val Wart = _root_.wartremover.Wart
+    val Warts = _root_.wartremover.Warts
   }
   import autoImport._
 
@@ -252,7 +252,7 @@ object WartRemover extends sbt.AutoPlugin {
 
   private[this] def inspectTask(x: Configuration): Seq[Def.Setting[?]] = Def.settings(
     x / wartremoverInspectOutputFile := None,
-    x / wartremoverInspectRun := Def.inputTaskDyn {
+    x / wartremover := Def.inputTaskDyn {
       val parsed = InspectArgs.from(
         InspectArgsParser.get(file(".").getAbsoluteFile.toPath).parsed
       )
@@ -366,11 +366,11 @@ object WartRemover extends sbt.AutoPlugin {
 
   private[this] def getJar(files: Set[String]): Def.Initialize[Task[Seq[Byte]]] = Def.task {
     val key = WartCacheKey(
-      scalaV = (wartremoverInspectRun / scalaVersion).value,
+      scalaV = (wartremover / scalaVersion).value,
       files = files
     )
-    val forkOps = (wartremoverInspectRun / forkOptions).value
-    val launcher = sbtLauncher(wartremoverInspectRun).value
+    val forkOps = (wartremover / forkOptions).value
+    val launcher = sbtLauncher(wartremover).value
     val log = state.value.log
 
     val res = wartRunCache.getOrElseUpdate(
