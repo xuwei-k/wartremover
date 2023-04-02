@@ -1,8 +1,6 @@
 package wartremover
 
-import sbt.file
 import java.io.File
-import java.io.FileNotFoundException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -12,90 +10,6 @@ import sbt.complete.FileExamples
 import sbt.complete.DefaultParsers.*
 import wartremover.InspectArg.Type
 import java.net.URI
-import scala.io.Source
-
-private[wartremover] case class InspectArgs(
-  sources: Seq[String],
-  warts: Seq[Wart]
-)
-
-private[wartremover] object InspectArgs {
-  val empty: InspectArgs = InspectArgs(Nil, Nil)
-  def from(values: Seq[(InspectArg, Type)]): Map[Type, InspectArgs] = {
-    val warnSources = List.newBuilder[String]
-    val warnWarts = List.newBuilder[Wart]
-    val errorSources = List.newBuilder[String]
-    val errorWarts = List.newBuilder[Wart]
-    values.foreach {
-      case (x: InspectArg.FromSource, tpe) =>
-        tpe match {
-          case Type.Warn =>
-            warnSources ++= x.getSourceContents
-          case Type.Err =>
-            errorSources ++= x.getSourceContents
-        }
-      case (x: InspectArg.WartName, tpe) =>
-        tpe match {
-          case Type.Warn =>
-            warnWarts += Wart.custom(x.value)
-          case Type.Err =>
-            errorWarts += Wart.custom(x.value)
-        }
-    }
-    Map(
-      Type.Warn -> InspectArgs(
-        sources = warnSources.result(),
-        warts = warnWarts.result()
-      ),
-      Type.Err -> InspectArgs(
-        sources = errorSources.result(),
-        warts = errorWarts.result()
-      ),
-    )
-  }
-}
-
-private[wartremover] sealed abstract class InspectArg extends Product with Serializable
-
-private[wartremover] object InspectArg {
-  sealed abstract class Type extends Product with Serializable
-  object Type {
-    case object Err extends Type
-    case object Warn extends Type
-  }
-  private[wartremover] sealed abstract class FromSource extends InspectArg {
-    def getSourceContents: Seq[String]
-  }
-  private def fromFile(x: File): Seq[String] = {
-    if (x.isFile) {
-      Source.fromFile(x)(scala.io.Codec.UTF8).getLines().mkString("\n") :: Nil
-    } else if (x.isDirectory) {
-      x.listFiles(_.isFile)
-        .map { f =>
-          Source.fromFile(f)(scala.io.Codec.UTF8).getLines().mkString("\n")
-        }
-        .toList
-    } else {
-      throw new FileNotFoundException(x.getAbsolutePath)
-    }
-  }
-
-  final case class SourceFile(value: Path) extends FromSource {
-    def getSourceContents: Seq[String] = fromFile(value.toFile)
-
-  }
-  final case class Uri(value: URI) extends FromSource {
-    def getSourceContents: Seq[String] = {
-      value.getScheme match {
-        case null =>
-          fromFile(file(value.toString))
-        case _ =>
-          Source.fromURL(value.toURL)(scala.io.Codec.UTF8).getLines().mkString("\n") :: Nil
-      }
-    }
-  }
-  final case class WartName(value: String) extends InspectArg
-}
 
 /**
  * derived from sbt-scalafix
