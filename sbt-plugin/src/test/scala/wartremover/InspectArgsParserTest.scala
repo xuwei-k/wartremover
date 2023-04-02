@@ -1,10 +1,12 @@
 package wartremover
 
 import org.scalactic.source.Position
+import org.scalatest.BeforeAndAfterAll
 import org.scalatest.EitherValues
 import org.scalatest.funsuite.AnyFunSuite
 import java.io.File
 import sbt.complete.Parser
+import sbt.io.IO
 import sbt.uri
 import wartremover.InspectArg.FailIfWartLoadError
 import wartremover.InspectWart.SourceFile
@@ -12,9 +14,28 @@ import wartremover.InspectWart.Type
 import wartremover.InspectWart.Uri
 import wartremover.InspectWart.WartName
 
-class InspectArgsParserTest extends AnyFunSuite with EitherValues {
+class InspectArgsParserTest extends AnyFunSuite with EitherValues with BeforeAndAfterAll {
+  private[this] lazy val base: File = IO.createTemporaryDirectory
+
+  override def beforeAll(): Unit = {
+    val dir1 = new File(base, "dir_1")
+    val dir2 = new File(base, "dir_2")
+    IO.createDirectory(dir1)
+    IO.createDirectory(dir2)
+    Seq(
+      new File(dir1, "file_1.scala"),
+      new File(dir1, "file_2.scala"),
+      new File(dir2, "file_3.scala"),
+      new File(base, "file_4.scala"),
+    ).foreach(x => IO.writeLines(x, Nil))
+  }
+  override def afterAll(): Unit = {
+    super.afterAll()
+    IO.delete(base)
+  }
+
   private[this] val parser = InspectArgsParser.get(
-    workingDirectory = new File("core/src/main/scala-2/").toPath.toAbsolutePath,
+    workingDirectory = base.toPath.toAbsolutePath,
     pathFilter = Function.const(true)
   )
   private[this] def parse(input: String): Either[String, Seq[InspectArg]] =
@@ -193,31 +214,27 @@ class InspectArgsParserTest extends AnyFunSuite with EitherValues {
     f(
       " file:",
       Set(
-        "org",
-        "org/wartremover",
-        "org/wartremover/Main.scala",
-        "org/wartremover/Plugin.scala",
-        "org/wartremover/WartTraverser.scala",
-        "org/wartremover/test",
-        "org/wartremover/test/WartTestTraverser.scala",
-        "org/wartremover/warts",
-        "org/wartremover/warts/Any.scala",
-        "org/wartremover/warts/ExplicitImplicitTypes.scala",
-        "org/wartremover/warts/FilterEmpty.scala",
-        "org/wartremover/warts/FinalVal.scala",
-        "org/wartremover/warts/GetOrElseNull.scala",
-        "org/wartremover/warts/ImplicitParameter.scala",
-        "org/wartremover/warts/IsInstanceOf.scala",
-        "org/wartremover/warts/IterableOps.scala",
-        "org/wartremover/warts/JavaSerializable.scala",
-        "org/wartremover/warts/LeakingSealed.scala",
-        "org/wartremover/warts/Nothing.scala",
-        "org/wartremover/warts/PublicInference.scala",
-        "org/wartremover/warts/Return.scala",
-        "org/wartremover/warts/Serializable.scala",
-        "org/wartremover/warts/Throw.scala",
-        "org/wartremover/warts/TripleQuestionMark.scala",
-        "org/wartremover/warts/TryPartial.scala",
+        "dir_1",
+        "dir_1/file_1.scala",
+        "dir_1/file_2.scala",
+        "dir_2",
+        "dir_2/file_3.scala",
+        "file_4.scala",
+      )
+    )
+
+    f(
+      " file:.",
+      Set(
+        "",
+        " ",
+        "  ",
+        "./dir_1",
+        "./dir_1/file_1.scala",
+        "./dir_1/file_2.scala",
+        "./dir_2",
+        "./dir_2/file_3.scala",
+        "./file_4.scala",
       )
     )
   }
