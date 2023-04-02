@@ -18,7 +18,7 @@ import java.net.URI
 private[wartremover] object InspectArgsParser {
   private[this] val typeParser: Parser[Type] = {
     val base: Parser[Type] =
-      Space ~> (token("--warn").map(_ => Type.Warn) | token("--error").map(_ => Type.Err))
+      Space ~> ((token("--warn") ^^^ Type.Warn) | (token("--error") ^^^ Type.Err))
 
     base.?.map(_.getOrElse(Type.Warn))
   }
