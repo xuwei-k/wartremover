@@ -53,8 +53,16 @@ class DiscardTest extends AnyFunSuite with ResultAssertions {
     }
   }
 
-  test("for generator") {
+  test("for expressions") {
     Seq(
+      WartTestTraverser(Discard.Try) {
+        def f[A](x: Option[Try[A]], a: Try[A]): Option[A] = {
+          for {
+            y <- x
+            b = a
+          } yield y.get
+        }
+      },
       WartTestTraverser(Discard.Try) {
         def f[A](x: Option[Try[A]]): Option[String] = {
           for {

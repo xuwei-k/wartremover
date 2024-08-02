@@ -50,6 +50,22 @@ abstract class Discard(filter: Quotes ?=> ([a <: AnyKind] => Type[a] => Boolean)
       def msg[B](t: TypeRepr): String =
         s"discard `${t.dealias.show}`"
 
+      private def createAccumulator[A](f: (A, Tree) => A): TreeAccumulator[A] =
+        new TreeAccumulator[A] {
+          override def foldTree(x: A, t: Tree)(owner: Symbol): A =
+            foldOverTree(f(x, t), t)(owner)
+        }
+
+      private def collectItent(t: Tree, owner: Symbol): Set[String] = {
+        val accumulator = createAccumulator[Set[String]] {
+          case (x, i: Ident) =>
+            x + i.name
+          case (x, _) =>
+            x
+        }
+        accumulator.foldTree(Set.empty, t)(owner)
+      }
+
       override def traverseTree(tree: Tree)(owner: Symbol): Unit = {
         tree match {
           case _ if hasWartAnnotation(tree) =>
@@ -72,20 +88,7 @@ abstract class Discard(filter: Quotes ?=> ([a <: AnyKind] => Type[a] => Boolean)
 
             if (params.nonEmpty) {
               f.rhs.foreach { body =>
-                val accumulator = new TreeAccumulator[Set[String]] {
-                  override def foldTree(x: Set[String], t: Tree)(owner: Symbol) = {
-                    foldOverTree(
-                      t match {
-                        case i: Ident =>
-                          x + i.name
-                        case _ =>
-                          x
-                      },
-                      t
-                    )(owner)
-                  }
-                }
-                val bodyNames: Set[String] = accumulator.foldTree(Set.empty, body)(owner)
+                val bodyNames: Set[String] = collectItent(body, owner)
                 params.filterNot(p => bodyNames(p.name)).foreach { x =>
                   error(x.pos, msg(x.tpt.tpe))
                 }
@@ -93,40 +96,39 @@ abstract class Discard(filter: Quotes ?=> ([a <: AnyKind] => Type[a] => Boolean)
             }
             super.traverseTree(tree)(owner)
           case f: CaseDef =>
-            PartialFunction
-              .condOpt(f.pattern) {
-                case Bind(x, w: Wildcard) if filter(w.tpe.asType) =>
-                  x -> w.tpe
-                case x: Ident if filter(x.tpe.asType) =>
-                  x.name -> x.tpe
-              }
-              .foreach { case (name, tpe) =>
-                val accumulator = new TreeAccumulator[Set[String]] {
-                  override def foldTree(x: Set[String], t: Tree)(owner: Symbol) = {
-                    foldOverTree(
-                      t match {
-                        case i: Ident =>
-                          x + i.name
-                        case _ =>
-                          x
-                      },
-                      t
-                    )(owner)
-                  }
-                }
-
+            f.pattern match {
+              case Bind(x, w: Wildcard) if filter(w.tpe.asType) =>
                 val namesSet: Set[String] =
-                  accumulator.foldTree(Set.empty, f.rhs)(owner) ++ f.guard
-                    .map(x => accumulator.foldTree(Set.empty, x)(owner))
-                    .toSeq
-                    .flatten
+                  collectItent(f.rhs, owner) ++ f.guard.map(x => collectItent(x, owner)).toSeq.flatten
 
-                if (namesSet(name)) {
+                if (namesSet(x)) {
                   // ok
                 } else {
-                  error(f.pattern.pos, msg(tpe))
+                  error(f.pattern.pos, msg(w.tpe))
                 }
-              }
+              case _ =>
+                val patternAccumulator = createAccumulator[Map[String, Ident]] {
+                  case (x, i: Ident) if filter(i.tpe.asType) =>
+                    x + (i.name -> i)
+                  case (x, _) =>
+                    x
+                }
+                val patternNames = patternAccumulator.foldTree(Map.empty, f.pattern)(owner)
+
+                if (patternNames.nonEmpty) {
+                  val namesSet: Set[String] =
+                    collectItent(f.rhs, owner) ++ f.guard.map(x => collectItent(x, owner)).toSeq.flatten
+
+                  patternNames.foreach { case (k, v) =>
+                    if (namesSet(k)) {
+                      // ok
+                    } else {
+                      error(f.pattern.pos, msg(v.tpe))
+                    }
+                  }
+                }
+            }
+
             super.traverseTree(tree)(owner)
           case _ =>
             super.traverseTree(tree)(owner)

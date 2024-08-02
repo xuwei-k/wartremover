@@ -155,6 +155,7 @@ class WartRemoverInspectorTest extends AnyFunSuite {
       result(s"cats-kernel_3-${catsVersion}.jar") === Map(
         ("AsInstanceOf", 5),
         ("CaseClassPrivateApply", 2),
+        ("Discard$Try", 2),
         ("Equals", 64),
         ("ForeachEntry", 2),
         ("ImplicitParameter", 2),

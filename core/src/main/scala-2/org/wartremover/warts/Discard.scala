@@ -83,6 +83,27 @@ abstract class Discard(types: Set[String], subtype: Boolean) extends WartTravers
                 }
               }
             super.traverse(tree)
+          case f: CaseDef =>
+            f.pat.collect {
+              case x @ Bind(TermName(name), i @ Ident(TermName("_"))) if check(x.tpe) =>
+                name -> i
+            }.foreach { case (name, i) =>
+              val names = Set.newBuilder[String]
+              val traverser = new Traverser {
+                override def traverseName(name: Name): Unit = {
+                  names += name.toString
+                }
+              }
+              traverser.traverse(f.guard)
+              traverser.traverse(f.body)
+              val namesSet = names.result()
+              if (namesSet(name)) {
+                // ok
+              } else {
+                error(u)(i.pos, msg(i.tpe))
+              }
+            }
+            super.traverse(tree)
           case _ =>
             super.traverse(tree)
         }
