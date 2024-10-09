@@ -83,7 +83,7 @@ lazy val baseSettings = Def.settings(
   },
   Test / javaOptions ++= Seq("-Xmx5G"),
   run / fork := true,
-  scalaVersion := latestScala212,
+  scalaVersion := latestScala3,
 )
 
 lazy val commonSettings = Def.settings(
@@ -347,7 +347,7 @@ lazy val core = Project(
 val wartClasses = Def.task {
   val loader = (core / Test / testLoader).value
   val wartTraverserClass = Class.forName("org.wartremover.WartTraverser", false, loader)
-  Tests
+  val classes = Tests
     .allDefs((core / Compile / compile).value)
     .collect { case c: ClassLike =>
       val decoded = c.name.split('.').map(NameTransformer.decode).mkString(".")
@@ -368,11 +368,20 @@ val wartClasses = Def.task {
     )
     .filter(c => !Modifier.isAbstract(c.getModifiers) && wartTraverserClass.isAssignableFrom(c))
     .map(_.getSimpleName.replace("$", ""))
-    .filterNot(Set("Unsafe", "ForbidInference"))
-    .sorted
+    .filterNot(Set("Unsafe", "ForbidInference", "Matchable"))
+
+  val scala2only = Seq(
+    "ExplicitImplicitTypes",
+    "JavaConversions",
+    "JavaSerializable",
+    "PublicInference",
+  )
+  (classes ++ scala2only).distinct.sorted
 }
 
 val scoverage = "org.scoverage" % "sbt-scoverage" % "2.2.1" % "runtime" // for scala-steward
+
+def sbt2 = "2.0.0-M2"
 
 lazy val sbtPlug: Project = Project(
   id = "sbt-plugin",
@@ -380,6 +389,15 @@ lazy val sbtPlug: Project = Project(
 ).settings(
   commonSettings,
   name := "sbt-wartremover",
+  crossSbtVersions += sbt2,
+  pluginCrossBuild / sbtVersion := {
+    scalaBinaryVersion.value match {
+      case "2.12" =>
+        sbtVersion.value
+      case _ =>
+        "2.0.0-M2"
+    }
+  },
   libraryDependencies ++= {
     scalaBinaryVersion.value match {
       case scalaV @ "2.12" =>
@@ -415,7 +433,7 @@ lazy val sbtPlug: Project = Project(
   packagedArtifacts := {
     val value = packagedArtifacts.value
     val pomFiles = value.values.filter(_.getName.endsWith(".pom")).toList
-    assert(pomFiles.size == 2, pomFiles.map(_.getName))
+    assert(pomFiles.size >= 1, pomFiles.map(_.getName))
     pomFiles.foreach { f =>
       assert(!IO.read(f).contains("scoverage"))
     }
@@ -440,7 +458,26 @@ lazy val sbtPlug: Project = Project(
   libraryDependencies += "io.get-coursier" %% "coursier" % "2.1.13" % Test cross CrossVersion.for3Use2_13,
   scriptedLaunchOpts += ("-Dplugin.version=" + version.value),
   scriptedLaunchOpts += ("-Dscoverage.version=" + scoverage.revision),
-  crossScalaVersions := Seq(latestScala212),
+  crossScalaVersions := Seq(latestScala3),
+  TaskKey[Unit]("scriptedTestSbt2") := Def.taskDyn {
+    val values = sbtTestDirectory.value
+      .listFiles(_.isDirectory)
+      .flatMap { dir1 =>
+        dir1.listFiles(_.isDirectory).map { dir2 =>
+          dir1.getName -> dir2.getName
+        }
+      }
+      .toList
+    val exclude: Set[(String, String)] = Set(
+      "input-task",
+      "inspector",
+      "scoverage",
+    ).map("wartremover" -> _)
+    val args = values.filterNot(exclude).map { case (x1, x2) => s"${x1}/${x2}" }
+    val arg = args.mkString(" ", " ", "")
+    println("scripted " + arg)
+    scripted.toTask(arg)
+  }.value,
   (Compile / sourceGenerators) += Def.task {
     val base = (Compile / sourceManaged).value
     val file = base / "wartremover" / "Wart.scala"
