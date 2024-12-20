@@ -464,7 +464,15 @@ object WartRemover extends sbt.AutoPlugin with WartRemoverCompat {
       .distinct
   }
 
-  private[this] def sbtLauncher(k: HasSlashKey): Def.Initialize[Task[File]] = Def.taskDyn {
+  private[this] def sbtLauncher[A](k: InputKey[A]): Def.Initialize[Task[File]] = Def.taskDyn {
+    val v = (k / sbtVersion).value
+    Def.task {
+      val Seq(launcher) = getJarFiles("org.scala-sbt" % "sbt-launch" % v).value
+      launcher
+    }
+  }
+
+  private[this] def sbtLauncher[A](k: TaskKey[A]): Def.Initialize[Task[File]] = Def.taskDyn {
     val v = (k / sbtVersion).value
     Def.task {
       val Seq(launcher) = getJarFiles("org.scala-sbt" % "sbt-launch" % v).value
