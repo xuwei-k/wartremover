@@ -6,6 +6,8 @@ import tools.nsc.Phase
 import java.io.File
 import java.net.URI
 import java.net.URLClassLoader
+import java.nio.file.StandardOpenOption
+import java.util.concurrent.TimeUnit
 import scala.reflect.internal.util.NoPosition
 import scala.util.control.NonFatal
 
@@ -112,6 +114,21 @@ class Plugin(val global: Global) extends tools.nsc.plugins.Plugin {
     val phaseName = "wartremover-traverser"
 
     override def newPhase(prev: Phase) = new StdPhase(prev) {
+      val profileFile = new java.io.File("profile.json").toPath
+      java.nio.file.Files.write(
+        profileFile,
+        "".getBytes(java.nio.charset.StandardCharsets.UTF_8),
+      )
+      def appendProfile(str: String): Unit = {
+        java.nio.file.Files.write(
+          profileFile,
+          s"$str\n".getBytes(java.nio.charset.StandardCharsets.UTF_8),
+          StandardOpenOption.APPEND
+        )
+      }
+
+      def microTime(): Long = TimeUnit.NANOSECONDS.toMicros(System.nanoTime())
+
       override def apply(unit: CompilationUnit) = {
         val isExcluded = excludedFiles exists unit.source.file.absolute.path.startsWith
 
@@ -133,6 +150,7 @@ class Plugin(val global: Global) extends tools.nsc.plugins.Plugin {
 
           def go(ts: List[WartTraverser], onlyWarn: Boolean): Unit = {
             ts.foreach { traverser =>
+              val start = microTime()
               try {
                 traverser.apply(wartUniverse(onlyWarn)).traverse(unit.body)
               } catch {
@@ -140,6 +158,11 @@ class Plugin(val global: Global) extends tools.nsc.plugins.Plugin {
                   val message = s"error wartremover ${traverser.className} ${unit.source.path} '${e.getMessage}'"
                   global.reporter.error(unit.targetPos, message)
                   throw e
+              } finally {
+                val n = s"${traverser.wartName}-${unit.source.file.name}"
+                appendProfile(
+                  s"""{"name":"${n}","ph":"X","ts":${start},"dur":${microTime() - start},"pid":0}"""
+                )
               }
             }
           }
