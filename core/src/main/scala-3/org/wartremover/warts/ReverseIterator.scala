@@ -11,7 +11,7 @@ object ReverseIterator extends WartTraverser {
           case t if hasWartAnnotation(t) =>
           case t if t.isExpr =>
             t.asExpr match {
-              case '{ ($x: collection.Seq[t]).reverse.iterator } =>
+              case '{ ($x: collection.Seq[?]).reverse.iterator } =>
                 error(t.pos, "you can use reverseIterator instead of reverse.iterator")
               case _ =>
                 super.traverseTree(tree)(owner)

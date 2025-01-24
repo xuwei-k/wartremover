@@ -11,7 +11,7 @@ object GetOrElseNull extends WartTraverser {
           case t if hasWartAnnotation(t) =>
           case t if t.isExpr =>
             t.asExpr match {
-              case '{ ($x: Option[t]).getOrElse(null) } =>
+              case '{ ($x: Option[?]).getOrElse(null) } =>
                 error(t.pos, "you can use orNull instead of getOrElse(null)")
               case _ =>
                 super.traverseTree(tree)(owner)
