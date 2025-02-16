@@ -16,27 +16,9 @@ ThisBuild / sbtPluginPublishLegacyMavenStyle := false
 //
 // add more scala versions when found binary and/or source incompatibilities in scala-compiler
 lazy val allScalaVersions = Seq(
-  "2.12.18",
-  "2.12.19",
   "2.12.20",
-  "2.13.14",
-  "2.13.15",
   "2.13.16",
-  "3.1.3",
-  "3.2.2",
-  "3.3.0",
-  "3.3.1",
-  "3.3.2",
-  "3.3.3",
-  "3.3.4",
   "3.3.5",
-  "3.4.3",
-  "3.5.2",
-  "3.6.0",
-  "3.6.1",
-  "3.6.2",
-  "3.6.3",
-  "3.6.4-RC1",
 )
 
 def latestScala212 = latest(12, allScalaVersions)

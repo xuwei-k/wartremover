@@ -4,10 +4,11 @@ import java.nio.file.Path
 import java.nio.charset.StandardCharsets
 import org.wartremover.InspectParam
 import org.wartremover.InspectResult
-import sbt.Keys.*
+import sbt.Keys._
 import sjsonnew.JsonFormat
 import sjsonnew.support.scalajson.unsafe.CompactPrinter
 import java.io.FileInputStream
+import java.net.URLClassLoader
 import java.util.zip.ZipInputStream
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.Await
@@ -45,6 +46,7 @@ object WartRemover extends sbt.AutoPlugin with WartRemoverCompat {
 
   override def globalSettings = Seq(
     Global / concurrentRestrictions += Tags.limit(WartremoverTag, 2),
+    // wartremoverTask / fork := true,
     wartremoverInspectScalaVersion := {
       "3.3.5"
     },
@@ -60,6 +62,99 @@ object WartRemover extends sbt.AutoPlugin with WartRemoverCompat {
   )
 
   private[this] def runInspector(
+    projectName: String,
+    base: File,
+    param: InspectParam,
+    scalaV: String,
+    launcher: File,
+    scalaSources: Seq[File],
+    forkOptions: ForkOptions,
+    jarFiles: Seq[Seq[Byte]],
+    extraSettings: Seq[String],
+    fork: Boolean,
+    libraryJarFiles: Seq[File],
+  ): Either[Int, String] = {
+//    if (fork) {
+    if (false) {
+      runInspectorFork(
+        projectName = projectName,
+        base = base,
+        param = param,
+        scalaV = scalaV,
+        launcher = launcher,
+        scalaSources = scalaSources,
+        forkOptions = forkOptions,
+        jarFiles = jarFiles,
+        extraSettings = extraSettings
+      )
+    } else {
+      Right(
+        runInspectorInProcess(
+          base = base,
+          param = param,
+          scalaV = scalaV,
+          launcher = launcher,
+          scalaSources = scalaSources,
+          forkOptions = forkOptions,
+          jarFiles = jarFiles,
+          libraryJarFiles = libraryJarFiles,
+        )
+      )
+    }
+  }
+
+  private[this] def runInspectorInProcess(
+    base: File,
+    param: InspectParam,
+    scalaV: String,
+    launcher: File,
+    scalaSources: Seq[File],
+    forkOptions: ForkOptions,
+    jarFiles: Seq[Seq[Byte]],
+    libraryJarFiles: Seq[File],
+  ): String = {
+    IO.withTemporaryDirectory { dir =>
+      val libDir = dir / "lib"
+      jarFiles.zipWithIndex.foreach { case (jarBytes, i) =>
+        IO.write(libDir / s"warts${i}.jar", jarBytes.toArray)
+      }
+      val out = dir / "out.json"
+      val in = dir / "in.json"
+      IO.copy(
+        scalaSources.flatMap { f =>
+          IO.relativize(base, f).map { x =>
+            f -> (dir / x)
+          }
+        }
+      )
+      IO.write(in, param.toJsonString.getBytes(StandardCharsets.UTF_8))
+      val allJar = (libraryJarFiles ++ Option(libDir.listFiles(_.isFile)).toList.flatten).distinct.sorted.iterator
+        .map(_.toURI.toURL)
+        .toArray
+      println("-" * 100)
+      println(allJar.mkString("\n"))
+      println("*" * 100)
+      Using.resource(
+        new URLClassLoader(
+          allJar,
+          null
+        )
+      ) { loader =>
+        val clazz = loader.loadClass("org.wartremover.WartRemoverInspector")
+        val mainMethod = clazz.getMethod("main", classOf[Array[String]])
+        mainMethod.invoke(
+          null,
+          Array[String](
+            s"--input=${in.getCanonicalPath}",
+            s"--output=${out.getCanonicalPath}",
+          )
+        )
+      }
+      IO.read(out)
+    }
+  }
+
+  private[this] def runInspectorFork(
     projectName: String,
     base: File,
     param: InspectParam,
@@ -348,6 +443,7 @@ object WartRemover extends sbt.AutoPlugin with WartRemoverCompat {
       log.info(s"skip ${thisTaskName} because ${reason}")
       InspectResult.empty
     }
+
     if (scalaBinaryVersion.value == "3") {
       if (errorWartNames.isEmpty && warningWartNames.isEmpty) {
         Def.task(skipLog("warts is empty"))
@@ -355,6 +451,7 @@ object WartRemover extends sbt.AutoPlugin with WartRemoverCompat {
         // avoid taskIf
         // https://github.com/sbt/sbt/issues/6862
         Def.taskDyn {
+          val scalaV = wartremoverInspectScalaVersion.value
           if ((x / tastyFiles).value.isEmpty) {
             Def.task(skipLog(s"${tastyFiles.key.label} is empty"))
           } else {
@@ -411,17 +508,22 @@ object WartRemover extends sbt.AutoPlugin with WartRemoverCompat {
                 outputStandardReporter = (x / wartremoverInspectOutputStandardReporter).value
               )
               val launcher = sbtLauncher(wartremoverInspect).value
-              val resultJson = runInspector(
-                projectName = thisTaskName,
-                base = (LocalRootProject / baseDirectory).value,
-                param = param,
-                scalaV = wartremoverInspectScalaVersion.value,
-                launcher = launcher,
-                (x / sources).value,
-                forkOptions = (wartremoverInspect / forkOptions).value,
-                jarFiles = jarFiles,
-                extraSettings = wartremoverInspectSettings.value,
-              ).fold(e => sys.error(s"${thisTaskName} failed ${e}"), identity)
+              val libraryJarFiles = inspectorJarFiles(scalaV).value
+              val resultJson = {
+                runInspector(
+                  projectName = thisTaskName,
+                  base = (LocalRootProject / baseDirectory).value,
+                  param = param,
+                  scalaV = scalaV,
+                  launcher = launcher,
+                  scalaSources = (x / sources).value,
+                  forkOptions = (wartremoverInspect / forkOptions).value,
+                  jarFiles = jarFiles,
+                  extraSettings = wartremoverInspectSettings.value,
+                  fork = (wartremoverTask / fork).value,
+                  libraryJarFiles = libraryJarFiles
+                ).fold(e => sys.error(s"${thisTaskName} failed ${e}"), identity)
+              }
               val result = {
                 val r = resultJson.decodeFromJsonString[InspectResult]
                 new InspectResult(errors = r.errors, warnings = r.warnings, stderr = r.stderr) {
@@ -447,6 +549,20 @@ object WartRemover extends sbt.AutoPlugin with WartRemoverCompat {
         skipLog(s"scalaVersion is ${scalaVersion.value}. not Scala 3")
       )
     }
+  }
+
+  private def inspectorJarFiles(scalaV: String): Def.Initialize[Task[Seq[File]]] = Def.task {
+    Seq(
+      getJarFiles(
+        "org.scala-lang" % "scala3-library_3" % scalaV
+      ).value,
+      getJarFiles(
+        "org.scala-lang" % "scala3-tasty-inspector_3" % scalaV
+      ).value,
+      getJarFiles(
+        "org.wartremover" % "wartremover-inspector_3" % s"${Wart.PluginVersion}",
+      ).value
+    ).flatten
   }
 
   private[wartremover] def getJarFiles(module: ModuleID): Def.Initialize[Task[Seq[File]]] = Def.task {
