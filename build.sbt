@@ -176,6 +176,7 @@ val coreSettings = Def.settings(
   name := "wartremover",
   Test / fork := true,
   crossScalaVersions := allScalaVersions,
+  libraryDependencies += "org.tpolecat" %% "doobie-core" % "0.13.4" % Test,
   Test / scalacOptions += {
     val hash = (Compile / sources).value.map { f =>
       sbt.internal.inc.HashUtil.farmHash(f.toPath)
