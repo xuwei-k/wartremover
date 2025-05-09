@@ -57,13 +57,13 @@ jobs:
             sbt -v Test/compile test
             ;;
           "scripted")
-            sbt -v publishLocal "sbt-pluginJVM2_12/scripted wartremover/*${{matrix.test_index}}of3"
+            sbt -v publishLocal "sbt-plugin2_12/scripted wartremover/*${{matrix.test_index}}of3"
             ;;
           "sbt2")
-            sbt -v publishLocal sbt-pluginJVM3/scriptedTestSbt2
+            sbt -v publishLocal sbt-plugin3/scriptedTestSbt2
             ;;
           "test")
-            sbt -v "all coreJVM3_3_6/test coreJVM2_13_16/test coreJVM2_12_20/test"
+            sbt -v "all core3_3_6/test core2_13_16/test core2_12_20/test"
             ;;
           *)
             echo "unknown job"

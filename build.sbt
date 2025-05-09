@@ -12,6 +12,8 @@ ThisBuild / sbtPluginPublishLegacyMavenStyle := false
 
 lazy val nightlyScala3: String = IO.read(file(".github/scala_3_nightly.txt")).trim
 
+val myJVMAxis = VirtualAxis.PlatformAxis("jvm", "", "jvm")
+
 // compiler plugin should be fully cross-versioned. e.g.
 // - https://github.com/ghik/silencer/issues/31
 // - https://github.com/typelevel/kind-projector/issues/15
@@ -237,8 +239,11 @@ val coreSettings = Def.settings(
 lazy val coreCrossBinary = projectMatrix
   .in(file("core-cross-binary"))
   .withId("core-cross-binary")
-  .defaultAxes()
-  .jvmPlatform(scalaVersions = Seq(latestScala212, latestScala213, latestScala3))
+  .jvmPlatform(
+    scalaVersions = Seq(latestScala212, latestScala213, latestScala3),
+    axisValues = Seq(myJVMAxis),
+    settings = Nil
+  )
   .settings(
     coreSettings,
     crossSrcSetting(Compile),
@@ -262,8 +267,7 @@ lazy val inspectorCommon = projectMatrix
   .withId(
     "inspector-common"
   )
-  .defaultAxes()
-  .jvmPlatform(scalaVersions = Seq(latestScala3, latestScala212))
+  .jvmPlatform(scalaVersions = Seq(latestScala3, latestScala212), axisValues = Seq(myJVMAxis), settings = Nil)
   .settings(
     commonSettings,
     name := "wartremover-inspector-common",
@@ -272,8 +276,7 @@ lazy val inspectorCommon = projectMatrix
 lazy val inspector = projectMatrix
   .in(file("inspector"))
   .withId("inspector")
-  .defaultAxes()
-  .jvmPlatform(scalaVersions = Seq(latestScala3))
+  .jvmPlatform(scalaVersions = Seq(latestScala3), axisValues = Seq(myJVMAxis), settings = Nil)
   .settings(
     commonSettings,
     name := "wartremover-inspector",
@@ -313,10 +316,12 @@ lazy val inspector = projectMatrix
 lazy val core: sbt.internal.ProjectMatrix = projectMatrix
   .in(file("core"))
   .withId("core")
-  .defaultAxes()
   .jvmPlatform(
+    autoScalaLibrary = true,
     scalaVersions = allScalaVersions,
-    crossVersion = CrossVersion.full
+    crossVersion = CrossVersion.full,
+    axisValues = Seq(myJVMAxis),
+    settings = Nil
   )
   .settings(
     coreSettings,
@@ -392,12 +397,13 @@ val scoverage = "org.scoverage" % "sbt-scoverage" % "2.3.1" % "runtime" // for s
 lazy val sbtPlug: sbt.internal.ProjectMatrix = projectMatrix
   .in(file("sbt-plugin"))
   .withId("sbt-plugin")
-  .defaultAxes()
-  .jvmPlatform(scalaVersions =
-    Seq(
+  .jvmPlatform(
+    scalaVersions = Seq(
       latestScala212,
       Scala3forSbt2,
-    )
+    ),
+    axisValues = Seq(myJVMAxis),
+    settings = Nil
   )
   .settings(
     commonSettings,
@@ -523,16 +529,18 @@ lazy val sbtPlug: sbt.internal.ProjectMatrix = projectMatrix
   )
   .enablePlugins(ScriptedPlugin)
 
-val `sbt-pluginJVM3` = sbtPlug.jvm(Scala3forSbt2).dependsOn(inspectorCommon.jvm(latestScala3))
-val `sbt-pluginJVM2_12` = sbtPlug.jvm(latestScala212).dependsOn(inspectorCommon.jvm(latestScala212))
+val `sbt-plugin3` = sbtPlug.jvm(Scala3forSbt2).dependsOn(inspectorCommon.jvm(latestScala3))
+val `sbt-plugin2_12` = sbtPlug.jvm(latestScala212).dependsOn(inspectorCommon.jvm(latestScala212))
 
 lazy val testMacros: sbt.internal.ProjectMatrix = projectMatrix
   .in(file("test-macros"))
   .withId("test-macros")
-  .defaultAxes()
   .jvmPlatform(
+    autoScalaLibrary = true,
     scalaVersions = allScalaVersions,
     crossVersion = CrossVersion.full,
+    axisValues = Seq(myJVMAxis),
+    settings = Nil
   )
   .settings(
     baseSettings,
