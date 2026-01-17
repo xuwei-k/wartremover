@@ -77,13 +77,27 @@ class WartremoverPhase(
     }
   }
 
+  private def parallelFilter[A](seq: Seq[A], f: A => Boolean): Seq[A] = {
+    import scala.concurrent.ExecutionContext.Implicits.global
+    import scala.concurrent.Await
+    import scala.concurrent.Future
+    import scala.concurrent.duration.*
+    Await
+      .result(
+        Future.sequence(
+          seq.map(x => Future(x -> f(x)))
+        ),
+        30.seconds
+      )
+      .collect { case (x, true) => x }
+  }
+
   override def prepareForUnit(tree: tpd.Tree)(using c: Context): Context = {
     val c2 = QuotesCache.init(c.fresh)
     val src = new String(tree.sourcePos.source.content)
-    import scala.collection.parallel.ParSeq
 
-    val errorWartsFiltered = ParSeq(errorWarts*).filter(x => x.check(src) == "continue")
-    val warningWartsFiltered = ParSeq(warningWarts*).filter(x => x.check(src) == "continue")
+    val errorWartsFiltered = parallelFilter(errorWarts, x => x.check(src) == "continue")
+    val warningWartsFiltered = parallelFilter(warningWarts, x => x.check(src) == "continue")
 
     val q = scala.quoted.runtime.impl.QuotesImpl()(using c2)
     def runWart(w: WartTraverser, onlyWarning: Boolean): Unit = {
