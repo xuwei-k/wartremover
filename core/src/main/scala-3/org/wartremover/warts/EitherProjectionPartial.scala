@@ -7,6 +7,14 @@ import scala.annotation.nowarn
 @nowarn("msg=Either.toOption.get")
 @nowarn("msg=Either.swap.getOrElse")
 object EitherProjectionPartial extends WartTraverser {
+  override def check(source: String) = {
+    if (source.contains("get")) {
+      "continue"
+    } else {
+      "skip"
+    }
+  }
+
   override def apply(u: WartUniverse): u.Traverser = {
     new u.Traverser(this) {
       import q.reflect.*

@@ -200,6 +200,16 @@ val coreSettings = Def.settings(
     s"-Dplease-recompile-because-main-source-files-changed-${hash}"
   },
   libraryDependencies ++= {
+    scalaBinaryVersion.value match {
+      case "3" =>
+        Seq(
+          "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0",
+        )
+      case _ =>
+        Nil
+    }
+  },
+  libraryDependencies ++= {
     Seq(
       "org.scala-lang.modules" %% "scala-xml" % "2.1.0" % "test",
     )

@@ -4,6 +4,14 @@ package warts
 import scala.annotation.nowarn
 
 object RedundantConversions extends WartTraverser {
+  override def check(source: String) = {
+    if (methodNames.exists(source.contains)) {
+      "continue"
+    } else {
+      "skip"
+    }
+  }
+
   private val methodNames: Seq[String] = Seq(
     "toList",
     "toSeq",

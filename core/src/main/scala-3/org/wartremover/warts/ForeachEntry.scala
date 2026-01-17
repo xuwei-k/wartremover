@@ -2,6 +2,14 @@ package org.wartremover
 package warts
 
 object ForeachEntry extends WartTraverser {
+  override def check(source: String) = {
+    if (source.contains("for")) {
+      "continue"
+    } else {
+      "skip"
+    }
+  }
+
   def apply(u: WartUniverse): u.Traverser = {
     new u.Traverser(this) {
       import q.reflect.*

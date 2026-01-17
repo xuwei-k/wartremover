@@ -16,6 +16,8 @@ abstract class WartTraverser { self =>
 
   def runsAfter: Set[String] = Set(TyperPhase.name)
 
+  def check(source: String): "skip" | "continue" = "continue"
+
   def apply(u: WartUniverse): u.Traverser
 
   def compose(o: WartTraverser): WartTraverser = new WartTraverser {

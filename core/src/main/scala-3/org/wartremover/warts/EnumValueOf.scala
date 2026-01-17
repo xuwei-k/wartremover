@@ -2,6 +2,14 @@ package org.wartremover
 package warts
 
 object EnumValueOf extends WartTraverser {
+  override def check(source: String) = {
+    if (source.contains("valueOf")) {
+      "continue"
+    } else {
+      "skip"
+    }
+  }
+
   override def apply(u: WartUniverse): u.Traverser = {
     new u.Traverser(this) {
       import q.reflect.*

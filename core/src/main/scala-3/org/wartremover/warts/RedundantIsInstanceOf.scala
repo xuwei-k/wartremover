@@ -2,6 +2,14 @@ package org.wartremover
 package warts
 
 object RedundantIsInstanceOf extends WartTraverser {
+  override def check(source: String) = {
+    if (source.contains("isInstanceOf")) {
+      "continue"
+    } else {
+      "skip"
+    }
+  }
+
   def apply(u: WartUniverse): u.Traverser = {
     new u.Traverser(this) {
       import q.reflect.*

@@ -79,6 +79,12 @@ class WartremoverPhase(
 
   override def prepareForUnit(tree: tpd.Tree)(using c: Context): Context = {
     val c2 = QuotesCache.init(c.fresh)
+    val src = new String(tree.sourcePos.source.content)
+    import scala.collection.parallel.ParSeq
+
+    val errorWartsFiltered = ParSeq(errorWarts*).filter(x => x.check(src) == "continue")
+    val warningWartsFiltered = ParSeq(warningWarts*).filter(x => x.check(src) == "continue")
+
     val q = scala.quoted.runtime.impl.QuotesImpl()(using c2)
     def runWart(w: WartTraverser, onlyWarning: Boolean): Unit = {
       val universe = WartUniverse(
@@ -100,8 +106,8 @@ class WartremoverPhase(
       }
     }
 
-    errorWarts.foreach(w => runWart(w = w, onlyWarning = false))
-    warningWarts.foreach(w => runWart(w = w, onlyWarning = true))
+    errorWartsFiltered.foreach(w => runWart(w = w, onlyWarning = false))
+    warningWartsFiltered.foreach(w => runWart(w = w, onlyWarning = true))
     c
   }
 

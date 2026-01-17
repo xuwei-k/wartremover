@@ -2,6 +2,14 @@ package org.wartremover
 package warts
 
 object ReverseIterator extends WartTraverser {
+  override def check(source: String) = {
+    if (source.contains("iterator") && source.contains("reverse")) {
+      "continue"
+    } else {
+      "skip"
+    }
+  }
+
   override def apply(u: WartUniverse): u.Traverser = {
     new u.Traverser(this) {
       import q.reflect.*

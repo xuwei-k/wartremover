@@ -4,6 +4,14 @@ package warts
 object FilterSize extends WartTraverser {
   private val sizeLengthMethods = Seq("size", "length")
 
+  override def check(source: String) = {
+    if (source.contains("filter")) {
+      "continue"
+    } else {
+      "skip"
+    }
+  }
+
   override def apply(u: WartUniverse): u.Traverser = {
     new u.Traverser(this) {
       import q.reflect.*

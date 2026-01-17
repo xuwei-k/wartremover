@@ -10,6 +10,14 @@ object SizeIs extends WartTraverser {
     "length",
   )
 
+  override def check(source: String) = {
+    if (source.contains("size") || source.contains("length")) {
+      "continue"
+    } else {
+      "skip"
+    }
+  }
+
   override def apply(u: WartUniverse): u.Traverser = {
     new u.Traverser(this) {
       import q.reflect.*
