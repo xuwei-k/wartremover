@@ -1,7 +1,5 @@
 on:
   push:
-    branches:
-      - master
   pull_request:
 jobs:
   benchmark:
@@ -12,8 +10,6 @@ jobs:
         include:
           - index: 0
           - index: 1
-          - index: 2
-          - index: 3
     runs-on: ubuntu-latest
     steps:
     - uses: actions/setup-java@v5

@@ -322,8 +322,12 @@ lazy val benchmark = project
   .settings(
     baseSettings,
     scalaVersion := benchmarkScalaVersion,
+    run / baseDirectory := target.value / "test-base-dir",
     libraryDependencies += "org.scala-lang" %% "scala3-tasty-inspector" % scalaVersion.value,
+    libraryDependencies += "org.scala-sbt" %% "io" % "1.10.5",
+    libraryDependencies += ("io.get-coursier" %% "coursier" % "2.1.24").cross(CrossVersion.for3Use2_13),
     Compile / sourceGenerators += Def.task {
+      (run / baseDirectory).value.mkdirs()
       val exclude = scala2only.toSet
       val dir = (Compile / sourceManaged).value
       def get(key: String): Option[Int] = sys.props.get(key).flatMap(_.toIntOption)
