@@ -51,6 +51,8 @@ def latestScala212 = latest(12, allScalaVersions)
 def latestScala213 = latest(13, allScalaVersions)
 def latestScala3 = allScalaVersions.filterNot(_ contains "-RC").filter(_ startsWith "3.3.").last // TODO more better way
 
+scalaVersion := latestScala3
+
 def latest(n: Int, versions: Seq[String]) = {
   val prefix = "2." + n + "."
   prefix + versions
@@ -201,6 +203,7 @@ val coreSettings = Def.settings(
   },
   libraryDependencies ++= {
     Seq(
+      "org.scalameta" %% "scalameta" % "4.14.5" cross CrossVersion.for3Use2_13,
       "org.scala-lang.modules" %% "scala-xml" % "2.1.0" % "test",
     )
   },
