@@ -60,6 +60,7 @@ class Plugin extends StandardPlugin with CompilerPluginCompat {
     val optionsSet = options.toSet
     val throwIfLoadFail = optionsSet.contains("on-wart-load-error:failure")
     val separatePhase = optionsSet.contains("separate-phase")
+    val profile = optionsSet.contains("profile")
     val loadFailureWarts = errors1 ++ errors2
     if (throwIfLoadFail && loadFailureWarts.nonEmpty) {
       println(loadFailureWarts.mkString("load failure warts = ", ", ", ""))
@@ -97,6 +98,7 @@ class Plugin extends StandardPlugin with CompilerPluginCompat {
               initialLog = initialLog,
               runsAfter = Set(phase),
               phaseName = phaseName(w),
+              profile = false,
             )
           },
           warningWartsInThisPhase.map { w =>
@@ -109,6 +111,7 @@ class Plugin extends StandardPlugin with CompilerPluginCompat {
               initialLog = initialLog,
               runsAfter = Set(phase),
               phaseName = phaseName(w),
+              profile = false,
             )
           },
         ).flatten
@@ -126,7 +129,8 @@ class Plugin extends StandardPlugin with CompilerPluginCompat {
               WartremoverPhase.defaultWartremoverPhaseName
             case _ =>
               s"${WartremoverPhase.defaultWartremoverPhaseName}-${phase}"
-          }
+          },
+          profile = profile
         ) :: Nil
       }
     }
