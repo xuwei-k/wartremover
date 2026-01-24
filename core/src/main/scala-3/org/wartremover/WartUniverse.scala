@@ -30,6 +30,48 @@ abstract class WartUniverse(onlyWarning: Boolean, logLevel: LogLevel) { self =>
   protected def onError(msg: String, pos: Position): Unit =
     quotes.reflect.report.error(msg = msg, pos = pos)
 
+  abstract class FusionTraverser(traverser: WartTraverser) extends Traverser(traverser) {
+    def traverseApply(tree: Apply, owner: Symbol): TraverseState =
+      TraverseState.Continue
+
+    def traverseSelect(tree: Select, owner: Symbol): TraverseState =
+      TraverseState.Continue
+
+    override final def traverseTree(tree: Tree)(owner: Symbol): Unit = {
+      tree.match {
+        case _ if hasWartAnnotation(tree) =>
+          TraverseState.Stop
+        case t: Apply =>
+          traverseApply(t, owner)
+        case t: Select =>
+          traverseSelect(t, owner)
+        case _ =>
+          TraverseState.Continue
+      } match {
+        case TraverseState.Continue =>
+          super.traverseTree(tree)(owner)
+        case TraverseState.Stop =>
+      }
+    }
+  }
+
+  class FusionTraversers(values: List[FusionTraverser]) extends TreeTraverser {
+    override final def traverseTree(tree: Tree)(owner: Symbol): Unit = {
+      val result: Iterator[TraverseState] = tree match {
+        case t: Apply =>
+          values.iterator.map(_.traverseApply(t, owner))
+        case t: Select =>
+          values.iterator.map(_.traverseSelect(t, owner))
+        case _ =>
+          Iterator.single(TraverseState.Continue)
+      }
+
+      if (result.forall(_ == TraverseState.Continue)) {
+        super.traverseTree(tree)(owner)
+      }
+    }
+  }
+
   abstract class Traverser(traverser: WartTraverser) extends TreeTraverser {
     final implicit val q: self.quotes.type = self.quotes
 

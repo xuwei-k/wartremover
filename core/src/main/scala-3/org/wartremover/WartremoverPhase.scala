@@ -112,38 +112,89 @@ class WartremoverPhase(
     }
   }
 
-  override def prepareForUnit(tree: tpd.Tree)(using c: Context): Context = {
-    val c2 = QuotesCache.init(c.fresh)
-    val q = scala.quoted.runtime.impl.QuotesImpl()(using c2)
-    def runWart(w: WartTraverser, onlyWarning: Boolean): Unit = {
-      val universe = WartUniverse(
-        onlyWarning = onlyWarning,
-        logLevel = logLevel,
-        quotes = q,
-      )
-      val traverser = w.apply(universe)
+  private def runWartremover(
+    tree: tpd.Tree,
+    q: scala.quoted.Quotes,
+    universe: WartUniverse.Aux[q.type],
+    warts: List[WartTraverser]
+  )(using c: Context): Unit = {
+    val (fusionTraversers, normalTraversers) = warts.partitionMap { w =>
+      w.apply(universe) match {
+        case x: universe.FusionTraverser =>
+          Left(w -> x)
+        case x =>
+          Right(w -> x)
+      }
+    }
+
+    normalTraversers.foreach { (w, traverser) =>
       val t = tree.asInstanceOf[traverser.q.reflect.Tree]
-      val start = System.nanoTime()
-      try {
-        traverser.traverseTree(t)(t.symbol)
-      } catch {
-        case NonFatal(e) =>
-          logLevel match {
-            case LogLevel.Disable =>
-            case LogLevel.Info | LogLevel.Debug =>
-              report.warning(e.toString, tree.srcPos)
-          }
-      } finally {
-        if (profile.isDefined) {
-          val adder = profileResult.getOrElseUpdate(w.fullName, new LongAdder)
-          adder.add(System.nanoTime() - start)
+      withProfile(w.fullName) {
+        withLog(tree) {
+          traverser.traverseTree(t)(t.symbol)
         }
       }
     }
 
-    errorWarts.foreach(w => runWart(w = w, onlyWarning = false))
-    warningWarts.foreach(w => runWart(w = w, onlyWarning = true))
+    val fusion = universe.FusionTraversers(fusionTraversers.map(_._2))
+    val fusionName = fusionTraversers.map(_._1.fullName).mkString("-")
+    withProfile(fusionName) {
+      withLog(tree) {
+        val t = tree.asInstanceOf[universe.quotes.reflect.Tree]
+        fusion.traverseTree(t)(t.symbol)
+      }
+    }
+  }
+
+  override def prepareForUnit(tree: tpd.Tree)(using c: Context): Context = {
+    val c2 = QuotesCache.init(c.fresh)
+    val q = scala.quoted.runtime.impl.QuotesImpl()(using c2)
+    runWartremover(
+      tree,
+      q,
+      WartUniverse(
+        onlyWarning = false,
+        logLevel = logLevel,
+        quotes = q,
+      ),
+      errorWarts,
+    )
+    runWartremover(
+      tree,
+      q,
+      WartUniverse(
+        onlyWarning = true,
+        logLevel = logLevel,
+        quotes = q,
+      ),
+      warningWarts
+    )
+
     c
   }
 
+  private inline def withLog[A](tree: tpd.Tree)(inline a: => A)(using Context): Unit = {
+    try {
+      a
+    } catch {
+      case NonFatal(e) =>
+        logLevel match {
+          case LogLevel.Disable =>
+          case LogLevel.Info | LogLevel.Debug =>
+            report.warning(e.toString, tree.srcPos)
+        }
+    }
+  }
+
+  private inline def withProfile[A](inline profileName: String)(inline a: => A): A = {
+    val start = System.nanoTime()
+    try {
+      a
+    } finally {
+      if (profile.isDefined) {
+        val adder = profileResult.getOrElseUpdate(profileName, new LongAdder)
+        adder.add(System.nanoTime() - start)
+      }
+    }
+  }
 }
