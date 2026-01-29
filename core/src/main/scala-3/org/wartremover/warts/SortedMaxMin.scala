@@ -11,6 +11,26 @@ object SortedMaxMin extends WartTraverser {
     "last",
   )
 
+  private object SortedHeadOrLast {
+    def unapply(method: String): Option[String] =
+      PartialFunction.condOpt(method) {
+        case "head" =>
+          "You can use min instead of sorted.head"
+        case "last" =>
+          "You can use max instead of sorted.last"
+      }
+  }
+
+  private object SortByHeadOrLast {
+    def unapply(method: String): Option[String] =
+      PartialFunction.condOpt(method) {
+        case "head" =>
+          "You can use minBy instead of sortBy.head"
+        case "last" =>
+          "You can use maxBy instead of sortBy.last"
+      }
+  }
+
   def apply(u: WartUniverse): u.Traverser = {
     new u.Traverser(this) {
       import q.reflect.*
@@ -20,33 +40,19 @@ object SortedMaxMin extends WartTraverser {
               if sortMethodNames
                 .forall(sourceCodeNotContains(tree, _)) || headOrLast.forall(sourceCodeNotContains(tree, _)) =>
           case t if hasWartAnnotation(t) =>
-          case t if t.isExpr =>
-            t.asExpr match {
-              case '{
-                    type t1
-                    ($x: collection.Seq[`t1`]).sorted(using $o: Ordering[`t1`]).head
-                  } =>
-                error(t.pos, "You can use min instead of sorted.head")
-              case '{
-                    type t1
-                    ($x: collection.Seq[`t1`]).sorted(using $o: Ordering[`t1`]).last
-                  } =>
-                error(t.pos, "You can use max instead of sorted.last")
-              case '{
-                    type t1
-                    type t2
-                    ($x: collection.Seq[`t1`]).sortBy($f: Function1[`t1`, `t2`])(using $o: Ordering[`t2`]).head
-                  } =>
-                error(t.pos, "You can use minBy instead of sortBy.head")
-              case '{
-                    type t1
-                    type t2
-                    ($x: collection.Seq[`t1`]).sortBy($f: Function1[`t1`, `t2`])(using $o: Ordering[`t2`]).last
-                  } =>
-                error(t.pos, "You can use maxBy instead of sortBy.last")
-              case _ =>
-                super.traverseTree(tree)(owner)
-            }
+          case t @ Select(
+                Apply(TypeApply(Select(seq, "sorted"), _ :: Nil), _ :: Nil),
+                SortedHeadOrLast(message)
+              ) if seq.tpe.baseClasses.exists(_.fullName == "scala.collection.Seq") =>
+            error(selectNamePosition(t), message)
+          case t @ Select(
+                Apply(
+                  Apply(TypeApply(Select(seq, "sortBy"), _ :: Nil), _ :: Nil),
+                  _ :: Nil
+                ),
+                SortByHeadOrLast(message)
+              ) if seq.tpe.baseClasses.exists(_.fullName == "scala.collection.Seq") =>
+            error(selectNamePosition(t), message)
           case _ =>
             super.traverseTree(tree)(owner)
         }
