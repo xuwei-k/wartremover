@@ -1,74 +1,78 @@
 package org.wartremover
 package warts
 
+import java.util.concurrent.atomic.LongAdder
+
 object RedundantConversions extends WartTraverser {
-  private val methodNames: Seq[String] = Seq(
-    "toList",
-    "toSeq",
-    "toVector",
-    "toStream",
-    "toSet",
-    "toIndexedSeq",
-    "toString",
-    "toInt",
-    "toLong",
-    "toFloat",
-    "toDouble",
-    "toByte",
-    "toShort",
-    "toChar",
-  )
+  private val values = collection.mutable.Map.empty[String, LongAdder]
+
+  private var sum: Int = 0
+
+  private def f(s: String): Unit = {
+    sum += 1
+    values.getOrElseUpdate(s, new LongAdder).increment()
+    if (sum % 1000 == 0) {
+      values.view.mapValues(_.sum()).toSeq.sortBy(_._2).foreach(println)
+    }
+  }
 
   override def apply(u: WartUniverse): u.Traverser = {
     new u.Traverser(this) {
       import q.reflect.*
-      private val listSymbol = Symbol.requiredClass("scala.collection.immutable.List")
-      private val seqSymbol = Symbol.requiredClass("scala.collection.immutable.Seq")
-      private val vectorSymbol = Symbol.requiredClass("scala.collection.immutable.Vector")
-      private val streamSymbol = Symbol.requiredClass("scala.collection.immutable.Stream")
-      private val setSymbol = Symbol.requiredClass("scala.collection.immutable.Set")
-      private val indexedSeqSymbol = Symbol.requiredClass("scala.collection.immutable.IndexedSeq")
 
       override def traverseTree(tree: Tree)(owner: Symbol): Unit = {
         tree match {
-          case _ if methodNames.forall(sourceCodeNotContains(tree, _)) =>
-          case t if hasWartAnnotation(t) =>
-          case s @ Select(t, method) =>
-            method match {
-              case "toList" if t.tpe.derivesFrom(listSymbol) =>
-                error(selectNamePosition(s), "redundant toList conversion")
-              case "toSeq" if t.tpe.derivesFrom(seqSymbol) =>
-                error(selectNamePosition(s), "redundant toSeq conversion")
-              case "toVector" if t.tpe.derivesFrom(vectorSymbol) =>
-                error(selectNamePosition(s), "redundant toVector conversion")
-              case "toStream" if t.tpe.derivesFrom(streamSymbol) =>
-                error(selectNamePosition(s), "redundant toStream conversion")
-              case "toSet" if t.tpe.derivesFrom(setSymbol) =>
-                error(selectNamePosition(s), "redundant toSet conversion")
-              case "toIndexedSeq" if t.tpe.derivesFrom(indexedSeqSymbol) =>
-                error(selectNamePosition(s), "redundant toIndexedSeq conversion")
-              case "toString" if t.tpe <:< TypeRepr.of[String] =>
-                error(selectNamePosition(s), "redundant toString conversion")
-              case "toInt" if t.tpe <:< TypeRepr.of[Int] =>
-                error(selectNamePosition(s), "redundant toInt conversion")
-              case "toLong" if t.tpe <:< TypeRepr.of[Long] =>
-                error(selectNamePosition(s), "redundant toLong conversion")
-              case "toFloat" if t.tpe <:< TypeRepr.of[Float] =>
-                error(selectNamePosition(s), "redundant toFloat conversion")
-              case "toDouble" if t.tpe <:< TypeRepr.of[Double] =>
-                error(selectNamePosition(s), "redundant toDouble conversion")
-              case "toByte" if t.tpe <:< TypeRepr.of[Byte] =>
-                error(selectNamePosition(s), "redundant toByte conversion")
-              case "toShort" if t.tpe <:< TypeRepr.of[Short] =>
-                error(selectNamePosition(s), "redundant toShort conversion")
-              case "toChar" if t.tpe <:< TypeRepr.of[Char] =>
-                error(selectNamePosition(s), "redundant toChar conversion")
-              case _ =>
-                super.traverseTree(tree)(owner)
-            }
-          case _ =>
-            super.traverseTree(tree)(owner)
+          case _: Ident => f("Ident")
+          case _: Select => f("Select")
+          case _: This => f("This")
+          case _: Super => f("Super")
+          case _: Apply => f("Apply")
+          case _: TypeApply => f("TypeApply")
+          case _: Literal => f("Literal")
+          case _: New => f("New")
+          case _: Typed => f("Typed")
+          case _: TypedOrTest => f("TypedOrTest")
+          case _: NamedArg => f("NamedArg")
+          case _: Assign => f("Assign")
+          case _: Block => f("Block")
+          case _: If => f("If")
+          case _: While => f("While")
+          case _: Closure => f("Closure")
+          case _: Match => f("Match")
+          case _: Return => f("Return")
+          case _: Try => f("Try")
+          case _: Repeated => f("Repeated")
+          case _: Inlined => f("Inlined")
+          case _: ValDef => f("ValDef")
+          case _: DefDef => f("DefDef")
+          case _: TypeDef => f("TypeDef")
+          case _: ClassDef => f("ClassDef")
+          case _: Import => f("Import")
+          case _: Export => f("Export")
+          case _: PackageClause => f("PackageClause")
+          case _: Inferred => f("Inferred")
+          case _: TypeIdent => f("TypeIdent")
+          case _: TypeSelect => f("TypeSelect")
+          case _: TypeProjection => f("TypeProjection")
+          case _: Singleton => f("Singleton")
+          case _: Refined => f("Refined")
+          case _: Applied => f("Applied")
+          case _: ByName => f("ByName")
+          case _: Annotated => f("Annotated")
+          case _: LambdaTypeTree => f("LambdaTypeTree")
+          case _: TypeBind => f("TypeBind")
+          case _: TypeBlock => f("TypeBlock")
+          case _: MatchTypeTree => f("MatchTypeTree")
+          case _: WildcardTypeTree => f("WildcardTypeTree")
+          case _: TypeBoundsTree => f("TypeBoundsTree")
+          case _: CaseDef => f("CaseDef")
+          case _: TypeCaseDef => f("TypeCaseDef")
+          case _: Bind => f("Bind")
+          case _: Unapply => f("Unapply")
+          case _: Alternatives => f("Alternatives")
+          case _: SummonFrom => f("SummonFrom")
         }
+        super.traverseTree(tree)(owner)
       }
     }
   }
