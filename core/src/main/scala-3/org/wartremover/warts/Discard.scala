@@ -97,10 +97,19 @@ abstract class Discard(filter: Quotes ?=> ([a <: AnyKind] => Type[a] => Boolean)
             PartialFunction
               .condOpt(f.pattern) {
                 case Bind(x, w: Wildcard) if filterFunc(w.tpe) =>
-                  x -> w.tpe
+                  Seq(x -> w.tpe)
                 case x: Ident if filterFunc(x.tpe) =>
-                  x.name -> x.tpe
+                  Seq(x.name -> x.tpe)
+                case u: Unapply =>
+                  u.patterns.collect {
+                    case Bind(x, w: Wildcard) if filterFunc(w.tpe) =>
+                      x -> w.tpe
+                    case x: Ident if filterFunc(x.tpe) =>
+                      x.name -> x.tpe
+                  }
               }
+              .toSeq
+              .flatten
               .foreach { (name, tpe) =>
                 val accumulator = new TreeAccumulator[Set[String]] {
                   override def foldTree(x: Set[String], t: Tree)(owner: Symbol) = {
