@@ -20,7 +20,7 @@ jobs:
       with:
         java-version: 21
         distribution: temurin
-    - uses: actions/checkout@v7.0.1
+    - uses: actions/checkout@v2.3.4
     - uses: sbt/setup-sbt@v1.5.15
     - run: sbt
            --server
