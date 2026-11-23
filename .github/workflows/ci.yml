@@ -49,7 +49,7 @@ jobs:
         gh actions-lock --verify
       env:
         GH_TOKEN: ${{ github.token }}
-    - uses: coursier/cache-action@v9.0.1
+    - uses: coursier/cache-action@v5
     - uses: sbt/setup-sbt@v1.5.15
     - shell: bash
       env:
