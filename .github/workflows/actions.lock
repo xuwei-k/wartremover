@@ -5,16 +5,16 @@ version: 'v0.0.3'
 workflows:
     '.github/workflows/benchmark.yml':
         - 'actions/checkout@v7.0.1'
-        - 'actions/setup-java@v6.3.0'
+        - 'actions/setup-java@v2'
         - 'sbt/setup-sbt@v1.5.15'
     '.github/workflows/ci.yml':
         - 'actions/checkout@v7.0.1'
-        - 'actions/setup-java@v6.3.0'
+        - 'actions/setup-java@v2'
         - 'coursier/cache-action@v9.0.1'
         - 'sbt/setup-sbt@v1.5.15'
     '.github/workflows/scala-steward.yml':
         - 'actions/create-github-app-token@v3.3.0'
-        - 'actions/setup-java@v6.3.0'
+        - 'actions/setup-java@v2'
         - 'scala-steward-org/scala-steward-action@v2.97.0'
 dependencies:
     'actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9':
@@ -32,9 +32,9 @@ dependencies:
         commit: 'sha1-64ab729a6294000f5aa4a4bc0b73d1f32bc45510'
         owner_id: 44036562
         repo_id: 642580244
-    'actions/setup-java@v6.3.0':
-        ref: 'v6.3.0'
-        commit: 'sha1-d1374f8ac74474200d16ef8ecee22c7ae7a51880'
+    'actions/setup-java@v2':
+        ref: 'v2'
+        commit: 'sha1-215b7e5f829ab9cac114c149667e57dc1b70b4bc'
         owner_id: 44036562
         repo_id: 196057608
     'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a':
